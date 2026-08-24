@@ -137,7 +137,7 @@ jobs:
         shell: bash
         run: >-
           QT_QPA_PLATFORM=offscreen lldb --batch
-          -o run -o "thread backtrace all"
+          -o run -k 'image lookup -a $pc' -k 'thread backtrace all'
           -- build/ci/tests/nexpdf_core_tests opensRendersAndSearches -v2
 
       - name: Test Unix

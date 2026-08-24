@@ -30,7 +30,7 @@
 2. GitHub Actions 必须使用同一 Qt 6.11.2。`aqtinstall` 的 v3.3.0 标签缺少 Qt 6.11 Windows 新目录兼容修复，Windows 安装需继续固定到已验证提交 `8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b`，除非新的正式版本经实际 CI 验证后再升级。
 3. `install-qt-action` 的归档不能随意裁剪：Windows 使用 `qtbase`；Ubuntu 24.04 还需要 `icu`，否则 Qt 的 `rcc` 会因缺少 ICU 动态库而无法启动；macOS 使用 `qtbase`。修改归档列表后必须验证配置、编译和测试三步，而不能只看下载成功。
 4. Windows CI 需要 VS2022/v143 时固定使用 `windows-2022`。不得假定 `windows-latest` 永远提供 Visual Studio 2022；切换镜像前先检查实际 MSBuild、工具集和生成器版本。
-5. Chocolatey 的 `poppler` 26.6.0 包只展开源码，不提供 `pdftoppm.exe`。不得把 `choco install poppler` 的成功状态当成 Poppler 工具可用。Windows 独立渲染校验应使用固定版本的预编译包、校验 SHA-256、确认 `pdftoppm.exe` 存在，再把其 `bin` 写入 `GITHUB_PATH`。
+5. Chocolatey 的 `poppler` 26.6.0 包只展开源码，不提供 `pdftoppm.exe`。不得把 `choco install poppler` 的成功状态当成 Poppler 工具可用。Windows 独立渲染校验使用固定的 Poppler 26.02.0-0 预编译包，校验 SHA-256 `993E4A94376ED712FAFC7058D724EA0B943D118BBD2305CD9ED55174EB85CDA5`，确认 `pdftoppm.exe` 存在，再把其 `bin` 写入 `GITHUB_PATH`；该流程已通过 Windows Actions 实证。
 6. qpdf 的退出码 3 表示存在警告但没有结构错误；不同系统仓库中的 qpdf 版本可能对同一 MuPDF 输出给出不同警告。结构门槛使用 `qpdf --warning-exit-0 --check` 保留警告文本，同时只让真实错误导致失败；不得用 `|| true` 吞掉全部错误。
 7. macOS Universal 的 MuPDF 必须分别生成 arm64 与 x86_64 静态库，再用 `lipo` 合并。MuPDF Makefile 的 `ARCHFLAGS` 不会自动进入所有 C 编译命令，架构参数还必须通过 `XCFLAGS` 传入；合并前后都要用 `lipo -info` 验证每个静态库，不能只根据输出目录名判断架构。
 8. MuPDF Makefile 的 `build=` 只接受其支持的构建类型，架构差异放在独立 `OUT` 目录中。不得把 `release-arm64` 一类自定义目录名误当成合法 `build` 类型。
@@ -39,8 +39,7 @@
 
 ### 当前未解决项
 
-- 截至 2026-08-24，macOS Universal 的 `nexpdf_core_tests` 仍在 `opensRendersAndSearches` 退出前后发生 SIGSEGV；Linux、Windows 和 macOS UI 测试不复现。线程对象直接删除的风险已经修复，但事实证明它不是该崩溃的唯一原因。下一步必须使用 RelWithDebInfo 和 LLDB 调用栈定位，禁止跳过该测试、标记允许失败或宣称 macOS 已通过。
-- Windows 固定 Poppler 预编译包已在本地核对 SHA-256 和 `pdftoppm.exe` 归档路径，但 PATH 与运行仍需下一轮 Actions 实证；在 CI 通过前只能称为候选修复。
+- 截至 2026-08-24，macOS Universal 的 `nexpdf_core_tests` 仍在 `opensRendersAndSearches` 的首次正常渲染期间发生 SIGSEGV；LLDB 已确认崩溃线程为 `nexPDF document thread`，顶部地址位于 QtGui。Linux、Windows 和 macOS UI 测试不复现。线程对象直接删除的风险已经修复，但事实证明它不是该崩溃的原因。下一步必须取得崩溃时的完整线程回溯后再修改核心逻辑，禁止跳过该测试、标记允许失败或宣称 macOS 已通过。
 
 ## 发布纪律
 
