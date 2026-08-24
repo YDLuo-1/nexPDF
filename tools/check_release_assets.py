@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 
@@ -17,6 +18,7 @@ def main() -> int:
     parser.add_argument("directory", type=Path)
     parser.add_argument("--json", type=Path, required=True)
     parser.add_argument("--markdown", type=Path, required=True)
+    parser.add_argument("--over-limit-analysis", type=Path)
     args = parser.parse_args()
 
     records = []
@@ -25,7 +27,20 @@ def main() -> int:
             size_mib = path.stat().st_size / (1024 * 1024)
             records.append({"file": path.name, "size_mib": round(size_mib, 3), "within_target": size_mib <= LIMIT_MIB})
 
-    args.json.write_text(json.dumps({"limit_mib": LIMIT_MIB, "assets": records}, indent=2) + "\n", encoding="utf-8")
+    over_limit = [record for record in records if not record["within_target"]]
+    analysis = args.over_limit_analysis if over_limit else None
+    args.json.write_text(
+        json.dumps(
+            {
+                "limit_mib": LIMIT_MIB,
+                "assets": records,
+                "over_limit_analysis": str(analysis) if analysis else None,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     lines = [
         "# Package sizes / 发布包体积",
         "",
@@ -37,10 +52,18 @@ def main() -> int:
     for record in records:
         result = "PASS / 通过" if record["within_target"] else "OVER / 超出"
         lines.append(f"| `{record['file']}` | {record['size_mib']:.3f} | {result} |")
+    if analysis:
+        lines.extend(["", f"Over-target analysis / 超标组成分析: `{analysis}`"])
     args.markdown.write_text("\n".join(lines) + "\n", encoding="utf-8")
     if not records:
+        print("No binary release packages were found.", file=sys.stderr)
         return 2
-    return 0 if all(record["within_target"] for record in records) else 1
+    for record in records:
+        print(f"{record['file']}: {record['size_mib']:.3f} MiB")
+    if over_limit and (analysis is None or not analysis.is_file() or analysis.stat().st_size == 0):
+        print("A non-empty --over-limit-analysis document is required for packages above 80 MiB.", file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

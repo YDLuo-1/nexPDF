@@ -338,7 +338,8 @@ jobs:
         run: |
           test -f "docs/release-notes/$RELEASE_TAG.md"
           python tools/check_release_assets.py dist \
-            --json dist/PACKAGE_SIZES.json --markdown dist/PACKAGE_SIZES.md
+            --json dist/PACKAGE_SIZES.json --markdown dist/PACKAGE_SIZES.md \
+            --over-limit-analysis docs/package-size-analysis.md
           cd dist
           sha256sum * > SHA256SUMS
       - name: Publish GitHub Release

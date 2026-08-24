@@ -4,6 +4,10 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0-rc.4] - 2026-08-24
+
+- Require and publish a measured composition analysis when a binary package exceeds the 80 MiB target; RC.3 produced no incomplete GitHub Release.
+
 ## [1.0.0-rc.3] - 2026-08-24
 
 - Pass the repository license to NSIS by absolute path; RC.2 produced no incomplete GitHub Release.
