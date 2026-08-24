@@ -19,7 +19,7 @@ build_mupdf() {
     build=release OUT="build/$output_name" shared=no \
     HAVE_CURL=no HAVE_GLUT=no HAVE_X11=no \
     HAVE_TESSERACT=no HAVE_LEPTONICA=no HAVE_ZXINGCPP=no \
-    XCFLAGS="$feature_flags" ARCHFLAGS="$build_arch_flags" libs
+    XCFLAGS="$feature_flags $build_arch_flags" ARCHFLAGS="$build_arch_flags" libs
 }
 
 if [[ "$(uname -s)" == "Darwin" && "${NEXPDF_MACOS_UNIVERSAL:-1}" == "1" ]]; then

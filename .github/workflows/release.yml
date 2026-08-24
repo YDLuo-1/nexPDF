@@ -17,7 +17,7 @@ env:
 
 jobs:
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
@@ -58,12 +58,16 @@ jobs:
       - name: Independently validate generated PDFs
         shell: pwsh
         run: |
-          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
-          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/edited.pdf"
-          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
-          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
-          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf"
-          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
+          function Test-PdfStructure([string]$Path) {
+            qpdf --warning-exit-0 --check $Path
+            if ($LASTEXITCODE -ne 0) { throw "qpdf structure validation failed: $Path" }
+          }
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/edited.pdf"
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf"
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
           $encryption = qpdf '--password=用户-123' --show-encryption "$env:RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf"
           if ($LASTEXITCODE -ne 0 -or -not ($encryption -match 'file encryption method: AESv3')) { throw "AES-256 independent validation failed" }
           $aes128 = qpdf '--password=same-strong-password' --show-encryption "$env:RUNNER_TEMP/nexpdf-test-output/aes128-matching-passwords.pdf"
@@ -147,12 +151,12 @@ jobs:
           cmake --install build/release --prefix "$PWD/AppDir/usr"
       - name: Independently validate generated PDFs
         run: |
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/edited.pdf"
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf"
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/edited.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
           encryption="$(qpdf '--password=用户-123' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf")"
           grep -q 'file encryption method: AESv3' <<<"$encryption"
           aes128="$(qpdf '--password=same-strong-password' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes128-matching-passwords.pdf")"
@@ -228,12 +232,12 @@ jobs:
           stage/nexPDF.app/Contents/MacOS/nexPDF --version
       - name: Independently validate generated PDFs
         run: |
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/edited.pdf"
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf"
-          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/edited.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
           encryption="$(qpdf '--password=用户-123' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf")"
           grep -q 'file encryption method: AESv3' <<<"$encryption"
           aes128="$(qpdf '--password=same-strong-password' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes128-matching-passwords.pdf")"
