@@ -4,6 +4,10 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0-rc.3] - 2026-08-24
+
+- Pass the repository license to NSIS by absolute path; RC.2 produced no incomplete GitHub Release.
+
 ## [1.0.0-rc.2] - 2026-08-24
 
 - Add the Qt Tools archive required by Windows translation deployment; RC.1 produced no incomplete GitHub Release.

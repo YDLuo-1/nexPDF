@@ -39,11 +39,13 @@
 11. MuPDF 静态库必须排在 QtGui 之前链接。macOS LLDB 已证明反向顺序会让 MuPDF 的 `FT_Load_Glyph` 跳进 QtGui 内部另一套 FreeType 实现并崩溃；调整 CMake 链接依赖后必须检查实际链接命令，不能只看 `target_link_libraries` 源码顺序。
 12. GitHub HTTPS 偶发 TLS 握手中断时，只重试同一提交，可临时尝试 HTTP/1.1；不得把访问令牌写进远程 URL、命令或日志，也不得因重试重复创建内容相同的提交。
 13. Windows 执行 `windeployqt --translations` 时会调用 `lconvert.exe`。Release 的 Qt 归档必须包含 `qttools`，并在部署前确认 `lconvert.exe` 存在；`qttranslations` 下载成功不代表翻译部署工具齐全。`qttools` 只用于打包环境，不得因此把 QtTools 开发 DLL 混入用户包。
+14. NSIS 脚本中的许可证路径不得写成依赖当前工作目录的裸 `LICENSE`。Release 必须以 `LICENSE_FILE` 传入仓库许可证的绝对路径，脚本缺少参数时立即失败；打包完成后同时检查便携 ZIP 和 `setup.exe` 存在，不能把 ZIP 成功误当成整个 Windows 资产成功。
 
 ### 已解决但必须保留回归
 
 - macOS Universal 的 `nexpdf_core_tests` 曾在首次正常渲染期间 SIGSEGV。完整回溯为 `pdf_load_simple_font -> FT_Get_Advance -> FT_Load_Glyph -> QtGui`，链接日志同时确认误混入 Homebrew arm64 HarfBuzz/PKCS7。限定 MuPDF 搜索前缀并把 MuPDF 静态库移到 QtGui 前后，CI 运行 `32702657572` 的 macOS 核心/UI 测试、独立校验和冒烟已全部通过；这些链接约束和字体渲染测试不得删除。
 - `v1.0.0-rc.1` 的 Linux、macOS、源码资产构建成功，但 Windows 在翻译部署阶段因缺少 `lconvert.exe` 失败，发布步骤按设计被阻止，没有生成不完整 Release。后续版本必须保留 `qttools` 打包依赖和四类 job 全成功后才能发布的门槛。
+- `v1.0.0-rc.2` 已证明 Windows 的 Qt 翻译部署、运行库检查和无弹窗冒烟通过，但 NSIS 因裸相对路径 `LICENSE` 找不到许可证而失败；Linux、macOS 和源码资产成功，发布仍被阻止且没有不完整 Release。后续必须保留绝对 `LICENSE_FILE` 参数和安装程序存在性检查。
 
 ## 界面、密码与目录维护注意事项
 
@@ -59,3 +61,4 @@
 2. 正式 `v1.0.0`/Latest 还需要计划规定的人工界面检查和完整性能验收。仅自动化和打包通过时发布递增的 `v1.0.0-rc.N` 预发行版，不得提前降低门槛或把 RC 标成 Latest。
 3. 发布工作流必须在 Windows、Linux、macOS 和完整源码包四项都成功后再创建 Release；任何平台失败都不得手工拼凑成“完整三平台发布”。
 4. Windows 最终资产应同时提供便携 ZIP 和安装程序 EXE。便携版不能是孤立单 EXE，因为 Qt DLL 与平台插件属于必需运行时；测试程序、benchmark 和 `Qt6Test.dll` 不得进入最终用户包。
+5. 已推送的公开版本标签不可移动、覆盖或删除后重建。标签后发现问题时保留失败历史，修复提交进入 `main` 并递增 RC 编号；不得为了让页面好看而重写 RC.1、RC.2 等公开标签。

@@ -119,12 +119,20 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           $version = $env:RELEASE_TAG.TrimStart('v')
-          Compress-Archive -Path stage/* -DestinationPath "dist/nexPDF-$($env:RELEASE_TAG)-windows-x64-portable.zip"
+          $zipPath = "$pwd\dist\nexPDF-$($env:RELEASE_TAG)-windows-x64-portable.zip"
+          $setupPath = "$pwd\dist\nexPDF-$($env:RELEASE_TAG)-windows-x64-setup.exe"
+          $licensePath = "$pwd\LICENSE"
+          if (-not (Test-Path -LiteralPath $licensePath -PathType Leaf)) { throw "Missing license: $licensePath" }
+          Compress-Archive -Path stage/* -DestinationPath $zipPath
           & "${env:ProgramFiles(x86)}/NSIS/makensis.exe" `
             "/DINPUT_DIR=$pwd\stage" `
-            "/DOUTPUT_FILE=$pwd\dist\nexPDF-$($env:RELEASE_TAG)-windows-x64-setup.exe" `
+            "/DOUTPUT_FILE=$setupPath" `
             "/DVERSION=$version" `
-            "/DICON_FILE=$pwd\app\assets\nexpdf.ico" packaging/windows/installer.nsi
+            "/DICON_FILE=$pwd\app\assets\nexpdf.ico" `
+            "/DLICENSE_FILE=$licensePath" packaging/windows/installer.nsi
+          foreach ($asset in @($zipPath, $setupPath)) {
+            if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) { throw "Missing Windows release asset: $asset" }
+          }
       - uses: actions/upload-artifact@v7
         with:
           name: windows-assets

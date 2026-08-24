@@ -13,6 +13,9 @@ Unicode true
 !ifndef ICON_FILE
   !error "ICON_FILE is required"
 !endif
+!ifndef LICENSE_FILE
+  !error "LICENSE_FILE is required"
+!endif
 
 Name "nexPDF ${VERSION}"
 OutFile "${OUTPUT_FILE}"
@@ -22,7 +25,7 @@ RequestExecutionLevel user
 SetCompressor /SOLID lzma
 
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "LICENSE"
+!insertmacro MUI_PAGE_LICENSE "${LICENSE_FILE}"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
