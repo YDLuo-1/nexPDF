@@ -104,7 +104,8 @@ jobs:
           & "${env:ProgramFiles(x86)}/NSIS/makensis.exe" `
             "/DINPUT_DIR=$pwd\stage" `
             "/DOUTPUT_FILE=$pwd\dist\nexPDF-$($env:RELEASE_TAG)-windows-x64-setup.exe" `
-            "/DVERSION=$version" packaging/windows/installer.nsi
+            "/DVERSION=$version" `
+            "/DICON_FILE=$pwd\app\assets\nexpdf.ico" packaging/windows/installer.nsi
       - uses: actions/upload-artifact@v7
         with:
           name: windows-assets

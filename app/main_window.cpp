@@ -1,5 +1,6 @@
 #include "main_window.h"
 
+#include "app_icons.h"
 #include "pdf_canvas.h"
 #include "version.h"
 
@@ -50,6 +51,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     setAcceptDrops(true);
     resize(1320, 860);
+    setWindowIcon(nexpdf::icons::applicationIcon());
     buildUi();
     buildMenus();
     buildToolPanel();
@@ -394,6 +396,40 @@ void MainWindow::buildMenus()
     chineseAction_ = new QAction(this);
     aboutAction_ = new QAction(this);
 
+    using nexpdf::icons::Kind;
+    using nexpdf::icons::actionIcon;
+    openAction_->setIcon(actionIcon(Kind::Open));
+    saveAsAction_->setIcon(actionIcon(Kind::SaveAs));
+    encryptAction_->setIcon(actionIcon(Kind::Encrypt));
+    decryptAction_->setIcon(actionIcon(Kind::Decrypt));
+    undoAction_->setIcon(actionIcon(Kind::Undo));
+    redoAction_->setIcon(actionIcon(Kind::Redo));
+    insertPageAction_->setIcon(actionIcon(Kind::InsertPage));
+    importPagesAction_->setIcon(actionIcon(Kind::ImportPages));
+    deletePageAction_->setIcon(actionIcon(Kind::DeletePage));
+    movePageUpAction_->setIcon(actionIcon(Kind::PageUp));
+    movePageDownAction_->setIcon(actionIcon(Kind::PageDown));
+    rotateLeftAction_->setIcon(actionIcon(Kind::RotateLeft));
+    rotateRightAction_->setIcon(actionIcon(Kind::RotateRight));
+    zoomInAction_->setIcon(actionIcon(Kind::ZoomIn));
+    zoomOutAction_->setIcon(actionIcon(Kind::ZoomOut));
+    actualSizeAction_->setIcon(actionIcon(Kind::ActualSize));
+    previousPageAction_->setIcon(actionIcon(Kind::PreviousPage));
+    nextPageAction_->setIcon(actionIcon(Kind::NextPage));
+    addTextAction_->setIcon(actionIcon(Kind::AddText));
+    addImageAction_->setIcon(actionIcon(Kind::AddImage));
+    highlightAction_->setIcon(actionIcon(Kind::Highlight));
+    underlineAction_->setIcon(actionIcon(Kind::Underline));
+    strikeOutAction_->setIcon(actionIcon(Kind::StrikeOut));
+    rectangleAction_->setIcon(actionIcon(Kind::Rectangle));
+    ellipseAction_->setIcon(actionIcon(Kind::Ellipse));
+    inkAction_->setIcon(actionIcon(Kind::Ink));
+    moveObjectAction_->setIcon(actionIcon(Kind::Move));
+    resizeObjectAction_->setIcon(actionIcon(Kind::Resize));
+    deleteObjectAction_->setIcon(actionIcon(Kind::DeleteObject));
+    redactionPreviewAction_->setIcon(actionIcon(Kind::RedactionPreview));
+    applyRedactionsAction_->setIcon(actionIcon(Kind::ApplyRedactions));
+
     openAction_->setShortcut(QKeySequence::Open);
     saveAsAction_->setShortcut(QKeySequence::SaveAs);
     undoAction_->setShortcut(QKeySequence::Undo);
@@ -502,12 +538,34 @@ void MainWindow::buildMenus()
 
     auto *toolbar = addToolBar(QStringLiteral("main"));
     toolbar->setObjectName(QStringLiteral("mainToolbar"));
-    toolbar->addActions({openAction_, saveAsAction_, undoAction_, redoAction_, previousPageAction_, nextPageAction_, zoomOutAction_, zoomInAction_});
+    toolbar->setIconSize(QSize(22, 22));
+    toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    toolbar->addActions({openAction_, saveAsAction_});
+    toolbar->addSeparator();
+    toolbar->addActions({undoAction_, redoAction_});
+    toolbar->addSeparator();
+    toolbar->addActions({previousPageAction_, nextPageAction_, zoomOutAction_, zoomInAction_, actualSizeAction_});
+    toolbar->addSeparator();
     searchEdit_ = new QLineEdit(toolbar);
     searchEdit_->setClearButtonEnabled(true);
     searchEdit_->setMaximumWidth(240);
+    searchEdit_->addAction(nexpdf::icons::actionIcon(Kind::Search), QLineEdit::LeadingPosition);
     toolbar->addWidget(searchEdit_);
     connect(searchEdit_, &QLineEdit::returnPressed, this, [this] { session_.search(searchEdit_->text()); });
+
+    addToolBarBreak(Qt::TopToolBarArea);
+    auto *editToolbar = addToolBar(QStringLiteral("edit"));
+    editToolbar->setObjectName(QStringLiteral("editToolbar"));
+    editToolbar->setIconSize(QSize(22, 22));
+    editToolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    editToolbar->addActions({importPagesAction_, insertPageAction_, deletePageAction_,
+                             movePageUpAction_, movePageDownAction_, rotateLeftAction_, rotateRightAction_});
+    editToolbar->addSeparator();
+    editToolbar->addActions({addTextAction_, addImageAction_});
+    editToolbar->addSeparator();
+    editToolbar->addActions({highlightAction_, underlineAction_, strikeOutAction_, rectangleAction_,
+                             ellipseAction_, inkAction_, moveObjectAction_, resizeObjectAction_,
+                             deleteObjectAction_, redactionPreviewAction_, applyRedactionsAction_});
 
     retranslateUi();
 }
@@ -570,10 +628,18 @@ void MainWindow::buildToolPanel()
     addTextWatermarkButton_ = new QPushButton(tr("Add text watermark"), panel);
     addImageWatermarkButton_ = new QPushButton(tr("Add image watermark…"), panel);
     scanWatermarkButton_ = new QPushButton(tr("Scan watermarks"), panel);
+    addTextWatermarkButton_->setObjectName(QStringLiteral("addTextWatermarkButton"));
+    addImageWatermarkButton_->setObjectName(QStringLiteral("addImageWatermarkButton"));
+    scanWatermarkButton_->setObjectName(QStringLiteral("scanWatermarkButton"));
+    addTextWatermarkButton_->setIcon(nexpdf::icons::actionIcon(nexpdf::icons::Kind::TextWatermark));
+    addImageWatermarkButton_->setIcon(nexpdf::icons::actionIcon(nexpdf::icons::Kind::ImageWatermark));
+    scanWatermarkButton_->setIcon(nexpdf::icons::actionIcon(nexpdf::icons::Kind::ScanWatermark));
     watermarkWarningLabel_ = new QLabel(tr("Review every candidate before removal. External baked-in watermarks may not be detected safely."), panel);
     watermarkWarningLabel_->setWordWrap(true);
     candidateList_ = new QListWidget(panel);
     removeWatermarkButton_ = new QPushButton(tr("Remove selected"), panel);
+    removeWatermarkButton_->setObjectName(QStringLiteral("removeWatermarkButton"));
+    removeWatermarkButton_->setIcon(nexpdf::icons::actionIcon(nexpdf::icons::Kind::RemoveWatermark));
     layout->addWidget(addTextWatermarkButton_);
     layout->addWidget(addImageWatermarkButton_);
     layout->addWidget(scanWatermarkButton_);
@@ -628,6 +694,33 @@ void MainWindow::retranslateUi()
     chineseAction_->setText(tr("简体中文"));
     aboutAction_->setText(tr("About nexPDF"));
     searchEdit_->setPlaceholderText(tr("Search"));
+    const auto setActionHint = [](QAction *action, const QString &description) {
+        QString tooltip = description;
+        if (!action->shortcut().isEmpty()) {
+            tooltip += QStringLiteral(" (%1)").arg(action->shortcut().toString(QKeySequence::NativeText));
+        }
+        action->setToolTip(tooltip);
+        action->setStatusTip(description);
+    };
+    const QList<QAction *> selfDescribingActions = {
+        openAction_, saveAsAction_, encryptAction_, decryptAction_, undoAction_, redoAction_,
+        insertPageAction_, importPagesAction_, deletePageAction_, movePageUpAction_, movePageDownAction_,
+        rotateLeftAction_, rotateRightAction_, zoomInAction_, zoomOutAction_, actualSizeAction_,
+        previousPageAction_, nextPageAction_, addTextAction_, addImageAction_, highlightAction_,
+        underlineAction_, strikeOutAction_, rectangleAction_, ellipseAction_, inkAction_, deleteObjectAction_
+    };
+    for (QAction *action : selfDescribingActions) setActionHint(action, action->text());
+    setActionHint(moveObjectAction_, tr("Select an object, then drag its destination"));
+    setActionHint(resizeObjectAction_, tr("Select an object, then drag its new bounds"));
+    setActionHint(redactionPreviewAction_, tr("Mark content for permanent redaction"));
+    setActionHint(applyRedactionsAction_, tr("Permanently remove marked content"));
+    searchEdit_->setToolTip(tr("Search document text and press Enter"));
+    if (QToolBar *toolbar = findChild<QToolBar *>(QStringLiteral("mainToolbar"))) {
+        toolbar->setWindowTitle(tr("Main toolbar"));
+    }
+    if (QToolBar *toolbar = findChild<QToolBar *>(QStringLiteral("editToolbar"))) {
+        toolbar->setWindowTitle(tr("Edit toolbar"));
+    }
     if (watermarkDock_ != nullptr) {
         watermarkDock_->setWindowTitle(tr("Watermark"));
         watermarkTextLabel_->setText(tr("Watermark text"));
@@ -653,6 +746,10 @@ void MainWindow::retranslateUi()
         addImageWatermarkButton_->setText(tr("Add image watermark…"));
         scanWatermarkButton_->setText(tr("Scan watermarks"));
         removeWatermarkButton_->setText(tr("Remove selected"));
+        addTextWatermarkButton_->setToolTip(tr("Add a removable text watermark"));
+        addImageWatermarkButton_->setToolTip(tr("Add a removable image watermark"));
+        scanWatermarkButton_->setToolTip(tr("Find removable watermark candidates"));
+        removeWatermarkButton_->setToolTip(tr("Remove only the checked candidates"));
         watermarkWarningLabel_->setText(tr("Review every candidate before removal. External baked-in watermarks may not be detected safely."));
     }
     for (QMenu *menu : menuBar()->findChildren<QMenu *>()) {

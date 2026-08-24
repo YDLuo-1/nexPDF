@@ -10,9 +10,13 @@ Unicode true
 !ifndef VERSION
   !define VERSION "0.0.0"
 !endif
+!ifndef ICON_FILE
+  !error "ICON_FILE is required"
+!endif
 
 Name "nexPDF ${VERSION}"
 OutFile "${OUTPUT_FILE}"
+Icon "${ICON_FILE}"
 InstallDir "$LOCALAPPDATA\nexPDF"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma

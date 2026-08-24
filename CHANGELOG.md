@@ -5,6 +5,7 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 ## [Unreleased]
 
 - Initial C++20/Qt/MuPDF architecture and public domain types.
+- Cohesive icon-only view/edit toolbars, bilingual tooltips, and native application icons for Windows, Linux, and macOS.
 - Background document session, password opening, rendering, search, practical edits, MuPDF journal undo/redo, permanent redaction, encryption/decryption, and validated atomic save.
 - Continuous Qt canvas, bilingual runtime translation, watermark creation/scanning/confirmed removal, and initial integration tests.
 - Slim MuPDF Windows build tooling and three-platform release scaffolding in progress.

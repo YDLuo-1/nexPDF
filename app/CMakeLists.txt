@@ -1,4 +1,6 @@
 add_library(nexpdf_app_ui STATIC
+  app_icons.cpp
+  app_icons.h
   app_translator.cpp
   app_translator.h
   main_window.cpp
@@ -7,12 +9,27 @@ add_library(nexpdf_app_ui STATIC
   pdf_canvas.h
 )
 
+qt_add_resources(nexpdf_app_ui "nexpdf_assets"
+  PREFIX "/nexpdf"
+  BASE assets
+  FILES assets/nexpdf-256.png)
+
 target_include_directories(nexpdf_app_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(nexpdf_app_ui PUBLIC nexpdf_core Qt6::Core Qt6::Gui Qt6::Widgets)
 target_compile_definitions(nexpdf_app_ui PUBLIC QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
 
 qt_add_executable(nexPDF main.cpp)
 target_link_libraries(nexPDF PRIVATE nexpdf_app_ui)
+
+if(WIN32)
+  target_sources(nexPDF PRIVATE assets/nexpdf.rc)
+endif()
+
+if(APPLE)
+  set_source_files_properties(assets/nexpdf.icns PROPERTIES
+    MACOSX_PACKAGE_LOCATION "Resources")
+  target_sources(nexPDF PRIVATE assets/nexpdf.icns)
+endif()
 
 if(MSVC)
   target_compile_options(nexpdf_app_ui PRIVATE /W4 /permissive- /utf-8)
@@ -28,7 +45,8 @@ set_target_properties(nexPDF PROPERTIES
   MACOSX_BUNDLE_BUNDLE_NAME "nexPDF"
   MACOSX_BUNDLE_GUI_IDENTIFIER "org.nexpdf.desktop"
   MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
-  MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
+  MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+  MACOSX_BUNDLE_ICON_FILE "nexpdf.icns")
 
 include(GNUInstallDirs)
 install(TARGETS nexPDF

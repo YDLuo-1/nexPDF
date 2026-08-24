@@ -1,11 +1,15 @@
 #include "main_window.h"
 #include "pdf_canvas.h"
 
+#include <QAction>
 #include <QDir>
 #include <QFile>
 #include <QLabel>
+#include <QPushButton>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QToolBar>
+#include <QWidgetAction>
 #include <QtTest>
 
 #include <algorithm>
@@ -75,6 +79,26 @@ void MainWindowTests::opensFixtureAndCapturesUi()
     fixture.close();
 
     MainWindow window;
+    QVERIFY(!window.windowIcon().isNull());
+    for (const QString &name : {QStringLiteral("mainToolbar"), QStringLiteral("editToolbar")}) {
+        auto *toolbar = window.findChild<QToolBar *>(name);
+        QVERIFY2(toolbar != nullptr, qPrintable(name));
+        QCOMPARE(toolbar->toolButtonStyle(), Qt::ToolButtonIconOnly);
+        for (QAction *action : toolbar->actions()) {
+            if (action->isSeparator() || qobject_cast<QWidgetAction *>(action) != nullptr) continue;
+            QVERIFY2(!action->icon().isNull(), qPrintable(action->text()));
+            QVERIFY2(!action->toolTip().isEmpty(), qPrintable(action->text()));
+        }
+    }
+    for (const QString &name : {QStringLiteral("addTextWatermarkButton"),
+                                QStringLiteral("addImageWatermarkButton"),
+                                QStringLiteral("scanWatermarkButton"),
+                                QStringLiteral("removeWatermarkButton")}) {
+        auto *button = window.findChild<QPushButton *>(name);
+        QVERIFY2(button != nullptr, qPrintable(name));
+        QVERIFY(!button->icon().isNull());
+        QVERIFY(!button->toolTip().isEmpty());
+    }
     window.setWindowOpacity(0.0);
     window.show();
     window.openFile(inputPath);

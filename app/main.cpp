@@ -1,3 +1,4 @@
+#include "app_icons.h"
 #include "main_window.h"
 #include "version.h"
 
@@ -26,6 +27,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationVersion(QString::fromLatin1(NEXPDF_VERSION));
     QCoreApplication::setOrganizationName(QStringLiteral("nexPDF"));
     QApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+    QApplication::setWindowIcon(nexpdf::icons::applicationIcon());
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("nexPDF — local cross-platform PDF tools"));
