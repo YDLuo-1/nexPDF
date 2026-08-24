@@ -13,10 +13,10 @@ rm -rf "$output_root/include/mupdf"
 cp -R "$mupdf_root/include/mupdf" "$output_root/include/"
 
 build_mupdf() {
-  local build_name="$1"
+  local output_name="$1"
   local build_arch_flags="$2"
   make -C "$mupdf_root" -j"$jobs" \
-    build="$build_name" shared=no \
+    build=release OUT="build/$output_name" shared=no \
     HAVE_CURL=no HAVE_GLUT=no HAVE_X11=no \
     HAVE_TESSERACT=no HAVE_LEPTONICA=no HAVE_ZXINGCPP=no \
     XCFLAGS="$feature_flags" ARCHFLAGS="$build_arch_flags" libs

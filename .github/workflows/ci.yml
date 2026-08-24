@@ -25,12 +25,18 @@ jobs:
           - name: Windows x64
             os: windows-latest
             qt_arch: win64_msvc2022_64
+            qt_archives: qtbase
+            aqt_source: git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b
           - name: Linux x86_64
             os: ubuntu-24.04
             qt_arch: linux_gcc_64
+            qt_archives: icu qtbase
+            aqt_source: ""
           - name: macOS Universal
             os: macos-15
             qt_arch: clang_64
+            qt_archives: qtbase
+            aqt_source: ""
 
     steps:
       - uses: actions/checkout@v6
@@ -46,6 +52,8 @@ jobs:
         with:
           version: 6.11.2
           arch: ${{ matrix.qt_arch }}
+          archives: ${{ matrix.qt_archives }}
+          aqtsource: ${{ matrix.aqt_source }}
           cache: true
 
       - name: Install Windows validators
