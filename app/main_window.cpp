@@ -846,17 +846,25 @@ void MainWindow::createEncryptedCopy()
     QLineEdit userPassword;
     QLineEdit ownerPassword;
     QLineEdit confirmPassword;
+    QLineEdit confirmOwnerPassword;
     userPassword.setEchoMode(QLineEdit::Password);
     ownerPassword.setEchoMode(QLineEdit::Password);
     confirmPassword.setEchoMode(QLineEdit::Password);
+    confirmOwnerPassword.setEchoMode(QLineEdit::Password);
     QComboBox algorithm;
     algorithm.addItem(tr("AES-256"), static_cast<int>(nexpdf::EncryptionAlgorithm::Aes256));
     algorithm.addItem(tr("AES-128 compatibility"), static_cast<int>(nexpdf::EncryptionAlgorithm::Aes128));
     form->addRow(tr("User password"), &userPassword);
     form->addRow(tr("Owner password"), &ownerPassword);
-    form->addRow(tr("User password") + QStringLiteral(" ×2"), &confirmPassword);
+    form->addRow(tr("Confirm user password"), &confirmPassword);
+    form->addRow(tr("Confirm owner password"), &confirmOwnerPassword);
     form->addRow(tr("Create encrypted copy"), &algorithm);
     layout->addLayout(form);
+    auto *passwordNotice = new QLabel(tr(
+        "Use non-empty, long, unique passwords. The user password protects opening; "
+        "the owner password controls unrestricted access."));
+    passwordNotice->setWordWrap(true);
+    layout->addWidget(passwordNotice);
     QCheckBox allowPrint(tr("Allow printing"));
     QCheckBox allowCopy(tr("Allow copying"));
     QCheckBox allowAnnotations(tr("Allow annotations"));
@@ -883,8 +891,23 @@ void MainWindow::createEncryptedCopy()
         QMessageBox::warning(this, tr("Error"), tr("Passwords do not match"));
         return;
     }
+    if (ownerPassword.text() != confirmOwnerPassword.text()) {
+        QMessageBox::warning(this, tr("Error"), tr("Owner passwords do not match"));
+        return;
+    }
+    if (userPassword.text().isEmpty()) {
+        QMessageBox::warning(this, tr("Error"),
+                             tr("A non-empty user password is required for confidential encryption."));
+        return;
+    }
     if (ownerPassword.text().isEmpty()) {
         QMessageBox::warning(this, tr("Error"), tr("An owner password is required."));
+        return;
+    }
+    if (userPassword.text() == ownerPassword.text()
+        && QMessageBox::warning(this, tr("Same passwords"),
+            tr("Some PDF readers try the user password first and may not grant owner access when both passwords are the same. AES confidentiality is unchanged, but permission behavior can be unreliable. Continue?"),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) {
         return;
     }
     const QString path = QFileDialog::getSaveFileName(this, tr("Save PDF"), {}, tr("PDF files (*.pdf)"));
@@ -903,7 +926,13 @@ void MainWindow::createEncryptedCopy()
     options.encryption.permissions.highQualityPrint = allowHighQualityPrint.isChecked();
     options.overwriteConfirmed = !QFileInfo::exists(path)
         || QMessageBox::question(this, tr("Replace file?"), tr("The destination exists. Replace it?")) == QMessageBox::Yes;
-    if (options.overwriteConfirmed) session_.saveAs(path, options);
+    if (options.overwriteConfirmed) {
+        session_.saveAs(path, options);
+        userPassword.clear();
+        ownerPassword.clear();
+        confirmPassword.clear();
+        confirmOwnerPassword.clear();
+    }
 }
 
 void MainWindow::createDecryptedCopy()

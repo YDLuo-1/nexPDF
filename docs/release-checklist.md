@@ -4,7 +4,7 @@ A tag is not a formal release until every required item is checked with attached
 
 - [ ] Exact Qt 6.11.2 and MuPDF 1.28.2 production build on Windows x64, Linux x86_64, and macOS Universal.
 - [ ] Unit/integration tests, qpdf `--check`, Poppler reference rendering, and clean-machine smoke tests pass.
-- [ ] AES-128/AES-256, legacy RC4 read, Unicode/empty/wrong passwords, permissions, and decryption corpus pass.
+- [ ] AES-128/AES-256, legacy RC4 read, Unicode passwords, empty-password rejection, wrong passwords, permissions, and decryption corpus pass.
 - [ ] Page operations, annotations, redaction, journal undo/redo, disk failure/cancel safety, and signature Save As gate pass.
 - [ ] nexPDF watermark add/remove render equivalence and external candidate false-positive corpus pass.
 - [ ] CJK, RTL, embedded fonts, transparency, layers, object streams, damaged xref, large images, and 100/300/1000-page corpus pass.

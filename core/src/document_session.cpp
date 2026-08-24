@@ -46,6 +46,24 @@ constexpr qsizetype kMaximumCachedDisplayLists = 8;
 constexpr int kMaximumTileEdge = 1024;
 constexpr auto kNexPdfWatermarkPrefix = "nexPDF:watermark:";
 
+void secureZero(void *data, std::size_t size) noexcept
+{
+    auto *byte = static_cast<volatile unsigned char *>(data);
+    while (size-- > 0) {
+        *byte++ = 0;
+    }
+}
+
+void secureClear(QByteArray &value) noexcept
+{
+    if (value.isEmpty()) {
+        return;
+    }
+    value.detach();
+    secureZero(value.data(), static_cast<std::size_t>(value.size()));
+    value.clear();
+}
+
 QString engineMessage(fz_context *context)
 {
     const char *message = fz_caught_message(context);
@@ -426,7 +444,8 @@ public:
         bool signedDocument = false;
         char title[512]{};
         const QByteArray nativePath = QDir::toNativeSeparators(file.absoluteFilePath()).toUtf8();
-        const QByteArray password = options.password.toUtf8();
+        QByteArray password = options.password.toUtf8();
+        auto clearPassword = qScopeGuard([&password] { secureClear(password); });
         fz_var(candidate);
         fz_var(needsPassword);
         fz_var(encryptedDocument);
@@ -477,7 +496,7 @@ public:
         pdf_ = pdf_specifics(context, document_);
         path_ = file.absoluteFilePath();
         encrypted_ = encryptedDocument;
-        password_ = options.password;
+        password_ = password;
         signedDocument_ = signedDocument;
         pageCount_ = pageCount;
         modified_ = false;
@@ -508,7 +527,7 @@ public:
         document_ = nullptr;
         pdf_ = nullptr;
         path_.clear();
-        password_.clear();
+        secureClear(password_);
         pageCount_ = 0;
         encrypted_ = false;
         signedDocument_ = false;
@@ -1708,6 +1727,30 @@ public:
                  tr("Confirm before replacing an existing file."), absoluteTarget);
             return;
         }
+
+        const bool createsEncryption = options.encryption.algorithm == EncryptionAlgorithm::Aes128
+            || options.encryption.algorithm == EncryptionAlgorithm::Aes256;
+        QByteArray userPassword = options.encryption.userPassword.toUtf8();
+        QByteArray ownerPassword = options.encryption.ownerPassword.toUtf8();
+        auto clearPasswords = qScopeGuard([&userPassword, &ownerPassword] {
+            secureClear(userPassword);
+            secureClear(ownerPassword);
+        });
+        if (createsEncryption && userPassword.isEmpty()) {
+            fail(ErrorCode::InvalidArgument, QStringLiteral("save"),
+                 tr("A non-empty user password is required for confidential encryption."));
+            return;
+        }
+        if (createsEncryption && ownerPassword.isEmpty()) {
+            fail(ErrorCode::InvalidArgument, QStringLiteral("save"),
+                 tr("An owner password is required for encrypted output."));
+            return;
+        }
+        if (userPassword.size() >= 128 || ownerPassword.size() >= 128) {
+            fail(ErrorCode::InvalidArgument, QStringLiteral("save"),
+                 tr("Passwords must be shorter than 128 UTF-8 bytes."));
+            return;
+        }
         if (!QDir().mkpath(targetInfo.absolutePath())) {
             fail(ErrorCode::IoError, QStringLiteral("save"),
                  tr("The destination directory cannot be created."));
@@ -1729,18 +1772,14 @@ public:
             QFile::remove(temporaryPath);
         });
 
-        const QByteArray userPassword = options.encryption.userPassword.toUtf8();
-        const QByteArray ownerPassword = options.encryption.ownerPassword.toUtf8();
-        if (userPassword.size() >= 128 || ownerPassword.size() >= 128) {
-            fail(ErrorCode::InvalidArgument, QStringLiteral("save"),
-                 tr("Passwords must be shorter than 128 UTF-8 bytes."));
-            return;
-        }
-
         fz_context *context = runtime_->context();
         QtOutputState state{&temporary};
         fz_output *output = nullptr;
         pdf_write_options writeOptions{};
+        auto clearWritePasswords = qScopeGuard([&writeOptions] {
+            secureZero(writeOptions.upwd_utf8, sizeof(writeOptions.upwd_utf8));
+            secureZero(writeOptions.opwd_utf8, sizeof(writeOptions.opwd_utf8));
+        });
         bool writeFailed = false;
         QString detail;
         fz_var(output);
@@ -1797,8 +1836,10 @@ public:
         modified_ = false;
         if (options.encryption.algorithm != EncryptionAlgorithm::Keep) {
             encrypted_ = options.encryption.algorithm != EncryptionAlgorithm::None;
-            password_ = options.encryption.userPassword.isEmpty()
-                ? options.encryption.ownerPassword : options.encryption.userPassword;
+            secureClear(password_);
+            if (encrypted_) {
+                password_ = userPassword;
+            }
         }
         post([absoluteTarget](DocumentSession *owner) { emit owner->saved(absoluteTarget); });
         emitState();
@@ -1977,11 +2018,9 @@ private:
         fz_page *page = nullptr;
         bool valid = false;
         const QByteArray nativePath = QDir::toNativeSeparators(path).toUtf8();
-        const QString chosenPassword = encryption.algorithm == EncryptionAlgorithm::Keep
-            ? password_
-            : encryption.userPassword.isEmpty() ? encryption.ownerPassword
-                                                : encryption.userPassword;
-        const QByteArray password = chosenPassword.toUtf8();
+        QByteArray password = encryption.algorithm == EncryptionAlgorithm::Keep
+            ? password_ : encryption.userPassword.toUtf8();
+        auto clearPassword = qScopeGuard([&password] { secureClear(password); });
         fz_var(validation);
         fz_var(page);
         fz_var(valid);
@@ -2056,7 +2095,7 @@ private:
     fz_document *document_ = nullptr;
     pdf_document *pdf_ = nullptr;
     QString path_;
-    QString password_;
+    QByteArray password_;
     int pageCount_ = 0;
     quint64 revision_ = 0;
     bool encrypted_ = false;

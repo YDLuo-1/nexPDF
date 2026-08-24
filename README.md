@@ -11,7 +11,7 @@ nexPDF 是一个本地运行、跨平台的 PDF 查看与实用编辑工具，�
 ### 功能
 
 - 查看：拖放和命令行打开、密码输入、连续滚动、页码导航、缩放、旋转和文本搜索。
-- 加密：AES-256（默认）和 AES-128 兼容模式，可配置用户/所有者密码及 PDF 权限。
+- 加密：AES-256（默认）和 AES-128 兼容模式；加密输出要求非空用户/所有者密码，并可配置 PDF 权限。
 - 解密：仅使用正确密码创建无加密副本；不包含破解、爆破或权限绕过功能。
 - 编辑：空白页、删除、排序、旋转、导入页面；添加、移动、缩放、删除工具创建的文字和图片；高亮、下划线、删除线、自由文本、图形、手绘批注。
 - 涂黑：先创建预览批注，再由用户确认永久应用。应用后重叠内容会被实际移除，不只是画黑框。
@@ -20,7 +20,7 @@ nexPDF 是一个本地运行、跨平台的 PDF 查看与实用编辑工具，�
 - 双语：跟随系统语言，并可在应用中切换简体中文/英文。
 - 界面：采用混合命令栏——打开、保存、加解密及高理解成本编辑显示图标与短文字，常见导航/批注保持紧凑图标；所有动作提供中英文 Tooltip，应用图标覆盖 Windows、Linux 和 macOS 包。
 
-PDF 权限主要依赖阅读器遵守，不能替代真正的数据访问控制。外部 PDF 可能把水印烘焙进正文、图片或共享 XObject；nexPDF 不保证识别所有此类水印，也不会自动删除启发式候选。请仅处理您拥有权利或已获得授权的文件，并始终保留备份。
+PDF 权限主要依赖阅读器遵守，不能替代真正的数据访问控制。用户密码与所有者密码可以相同，但部分阅读器会优先识别为用户密码，导致所有者权限行为不可靠，因此界面会提示风险。请使用较长、唯一且非空的密码。外部 PDF 可能把水印烘焙进正文、图片或共享 XObject；nexPDF 不保证识别所有此类水印，也不会自动删除启发式候选。请仅处理您拥有权利或已获得授权的文件，并始终保留备份。
 
 ### 界面
 
@@ -42,7 +42,7 @@ Windows 的精简 MuPDF 构建会排除 OCR、curl、OpenGL 查看器、Office �
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/Build-MuPDFWindows.ps1 -Configuration Release
 cmake -S . -B build/windows -G "Visual Studio 17 2022" -A x64 `
-  -DCMAKE_PREFIX_PATH=C:\Qt\6.11.2\msvc2022_64 `
+  -DCMAKE_PREFIX_PATH=D:\Qt\6.11.2\msvc2022_64 `
   -DMUPDF_ROOT="$PWD\out\mupdf-windows-x64"
 cmake --build build/windows --config Release --parallel
 ctest --test-dir build/windows -C Release --output-on-failure
@@ -52,12 +52,10 @@ Linux/macOS 以及打包步骤见 [构建说明](docs/building.md)。架构与�
 
 ### 已验证范围
 
-- 已在 Windows x64 使用 MSVC 19.44、真实 MuPDF 1.28.2 静态库和本地 Qt 6.10.2 完成 Release 链接；应用、测试和基准目标均已生成。
-- 本地 8 组核心功能用例已覆盖打开、渲染、搜索、选区取文、Unicode 密码 AES-256 加密/解密、空用户密码 AES-128 与权限、页面插入/旋转、文字/图片/墨迹/高亮批注、两阶段永久涂黑、对象两阶段调整、撤销/重做、跨 display-list LRU 淘汰的多页渲染、标准 Watermark 批注的候选确认移除，以及 nexPDF 水印添加、扫描、精确移除和渲染等价；Qt Test 总计 10 项（含初始化/清理）全部通过。
+- 已在 Windows x64 使用 MSVC 19.44、真实 MuPDF 1.28.2 静态库和统一安装的 Qt 6.11.2 完成 Release 链接；应用和测试目标均已生成。
+- 本地 8 组核心功能用例已覆盖打开、渲染、搜索、选区取文、Unicode 密码 AES-256 加密/解密、空用户/所有者密码拒绝、相同密码 AES-128 与权限、页面插入/旋转、文字/图片/墨迹/高亮批注、两阶段永久涂黑、对象两阶段调整、撤销/重做、跨 display-list LRU 淘汰的多页渲染、标准 Watermark 批注的候选确认移除，以及 nexPDF 水印添加、扫描、精确移除和渲染等价；Qt Test 总计 10 项（含初始化/清理）全部通过。
 - 独立 UI 冒烟在 Windows 11、150% DPI 下实例化真实主窗口、打开 PDF、等待主画布瓦片完成，检查混合图标/文字按钮和 Tooltip，并在同一用例中生成中英文截图；Qt Test 3 项（含初始化/清理）通过。
-- qpdf 12.4.0 已对解密、编辑、永久涂黑和水印测试输出完成 6 项独立结构检查，并确认 AES-256 使用 R=6/AESv3、AES-128 使用 AESv2 且权限限制生效；Poppler 26.02.0-0 成功渲染编辑与涂黑结果，且原始和去水印文件的参考渲染完全一致。
-- 本地 Qt 6.10.2 Windows 便携验证 ZIP（r7）实测 41.478 MiB，解压后依赖检查和隐藏式 `--version` 冒烟通过；最终用户包不含测试基准程序或 `Qt6Test.dll`。该文件不是正式 Release 资产。
-- Qt 6.11.2 在线包在当前镜像索引中不可直接安装；本地编译检查使用兼容的 Qt 6.10.2，正式发布仍锁定 6.11.2。
+- qpdf 12.4.0 已完成 9 项独立结构/加密检查，确认 AES-256 使用 R=6/AESv3、AES-128 使用 R=4/AESv2 且权限限制生效；Poppler 26.02.0 成功渲染加密、编辑、涂黑和去水印关键页。最终用户包不含测试基准程序或 `Qt6Test.dll`。
 - 上述证据仅是 Windows 本地验证，不代表发布检查表已经完成。Qt 6.11.2 三平台构建、复杂语料、完整编辑矩阵、真实 100/300/1000 页性能对比、干净虚拟机和界面截图仍须由 Release CI/人工验收完成。
 
 ### 许可与免责声明
@@ -77,7 +75,7 @@ nexPDF is a local, cross-platform PDF viewer and practical editor built with C++
 ### Features
 
 - Viewing: drag-and-drop and command-line opening, password prompt, continuous scrolling, page navigation, zoom, rotation, and text search.
-- Encryption: AES-256 by default, with AES-128 compatibility mode, user/owner passwords, and PDF permission flags.
+- Encryption: AES-256 by default, with AES-128 compatibility mode; encrypted output requires non-empty user/owner passwords and supports PDF permission flags.
 - Decryption: creates an unencrypted copy only with a correct password; no cracking, brute force, or permission bypass.
 - Editing: insert blank pages, delete, reorder, rotate, and import pages; add, move, resize, and remove tool-created text/images; highlights, underlines, strikeouts, free text, shapes, and ink annotations.
 - Redaction: create preview annotations first, then explicitly apply permanent redaction. Applying redaction removes overlapping content rather than drawing a cosmetic black box.
@@ -86,7 +84,7 @@ nexPDF is a local, cross-platform PDF viewer and practical editor built with C++
 - Bilingual UI: follows the system language and can switch between Simplified Chinese and English.
 - Interface: a hybrid command bar gives Open/Save, encryption, and higher-comprehension-cost edits an icon plus a short label, while familiar navigation/annotation commands stay compact; every action has bilingual tooltips and app icons are wired into Windows, Linux, and macOS packages.
 
-PDF permissions depend mainly on reader cooperation and are not a substitute for access control. External PDFs may bake watermarks into page content, images, or shared XObjects. nexPDF cannot promise to detect all such marks and never auto-deletes heuristic candidates. Process only files you own or are authorized to modify, and always keep backups.
+PDF permissions depend mainly on reader cooperation and are not a substitute for access control. User and owner passwords may match, but some readers try the user credential first and may not grant owner privileges, so the UI warns before continuing. Use long, unique, non-empty passwords. External PDFs may bake watermarks into page content, images, or shared XObjects. nexPDF cannot promise to detect all such marks and never auto-deletes heuristic candidates. Process only files you own or are authorized to modify, and always keep backups.
 
 ### Interface
 
@@ -108,7 +106,7 @@ The slim Windows MuPDF build excludes OCR, curl, the OpenGL viewer, Office expor
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/Build-MuPDFWindows.ps1 -Configuration Release
 cmake -S . -B build/windows -G "Visual Studio 17 2022" -A x64 `
-  -DCMAKE_PREFIX_PATH=C:\Qt\6.11.2\msvc2022_64 `
+  -DCMAKE_PREFIX_PATH=D:\Qt\6.11.2\msvc2022_64 `
   -DMUPDF_ROOT="$PWD\out\mupdf-windows-x64"
 cmake --build build/windows --config Release --parallel
 ctest --test-dir build/windows -C Release --output-on-failure
@@ -118,12 +116,10 @@ See [build documentation](docs/building.md) for Linux/macOS and packaging, [arch
 
 ### Verified scope
 
-- Windows x64 Release binaries for the application, tests, and benchmark have been linked with MSVC 19.44, real MuPDF 1.28.2 static libraries, and the locally available Qt 6.10.2.
-- Eight local core test groups cover open/render/search/selection, AES-256 encryption and decryption with a Unicode password, AES-128 with an empty user password and restricted permissions, page insertion/rotation, text/image/ink/highlight annotations, two-stage permanent redaction, two-stage object adjustment, undo/redo, multi-page rendering across display-list LRU eviction, confirmed removal of a standard Watermark annotation, and nexPDF watermark add/scan/exact removal/render equivalence. Qt Test reports ten passing items including initialization and cleanup.
+- Windows x64 Release binaries for the application and tests have been linked with MSVC 19.44, real MuPDF 1.28.2 static libraries, and the unified Qt 6.11.2 installation.
+- Eight local core test groups cover open/render/search/selection, AES-256 encryption and decryption with a Unicode password, rejection of empty user/owner passwords, AES-128 with matching credentials and restricted permissions, page insertion/rotation, text/image/ink/highlight annotations, two-stage permanent redaction, two-stage object adjustment, undo/redo, multi-page rendering across display-list LRU eviction, confirmed removal of a standard Watermark annotation, and nexPDF watermark add/scan/exact removal/render equivalence. Qt Test reports ten passing items including initialization and cleanup.
 - A separate Windows 11 UI smoke at 150% DPI instantiates the real main window, opens a PDF, waits for the main canvas tile, checks hybrid icon/text buttons and tooltips, and captures both English and Chinese layouts in one case. Its three Qt Test items, including initialization and cleanup, pass.
-- qpdf 12.4.0 independently accepted six decrypted, edited, permanently redacted, and watermarked outputs; it reported R=6/AESv3 for AES-256 and AESv2 with effective permission restrictions for AES-128. Poppler 26.02.0-0 rendered edited/redacted outputs and produced identical reference renders for the original and watermark-restored files.
-- A local Qt 6.10.2 Windows portable validation ZIP (r7) measured 41.478 MiB and passed extracted dependency and hidden `--version` smoke checks. The end-user package contains neither the benchmark executable nor `Qt6Test.dll`; it is not a formal Release asset.
-- Qt 6.11.2 could not be installed from the current online mirror index; compatible Qt 6.10.2 was used for the local compile check. Formal releases remain pinned to 6.11.2.
+- qpdf 12.4.0 completed nine independent structure/encryption checks, reporting R=6/AESv3 for AES-256 and R=4/AESv2 with effective permission restrictions for AES-128. Poppler 26.02.0 rendered encrypted, edited, redacted, and watermark-restored key pages. The end-user package contains neither the benchmark executable nor `Qt6Test.dll`.
 - This is Windows-local evidence, not completion of the release checklist. Exact-Qt three-platform builds, complex corpora, the complete editing matrix, real 100/300/1000-page performance comparisons, clean-VM checks, and UI screenshots still require Release CI and human acceptance.
 
 ### License and disclaimer

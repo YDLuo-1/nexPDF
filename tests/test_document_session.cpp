@@ -102,7 +102,7 @@ class DocumentSessionTests final : public QObject {
 private slots:
     void opensRendersAndSearches();
     void encryptsAndDecryptsWithValidation();
-    void encryptsAes128WithEmptyUserPassword();
+    void enforcesRequiredPasswordsAndAllowsMatchingCredentials();
     void editsPagesAnnotationsAndJournal();
     void appliesPermanentRedaction();
     void rendersAcrossDisplayListLruEviction();
@@ -221,12 +221,14 @@ void DocumentSessionTests::encryptsAndDecryptsWithValidation()
     retainArtifact(decryptedPath, QStringLiteral("decrypted.pdf"));
 }
 
-void DocumentSessionTests::encryptsAes128WithEmptyUserPassword()
+void DocumentSessionTests::enforcesRequiredPasswordsAndAllowsMatchingCredentials()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
     const QString input = writeFixture(directory.path());
-    const QString encryptedPath = directory.path() + QStringLiteral("/aes128-empty-user.pdf");
+    const QString missingUserPath = directory.path() + QStringLiteral("/missing-user.pdf");
+    const QString missingOwnerPath = directory.path() + QStringLiteral("/missing-owner.pdf");
+    const QString encryptedPath = directory.path() + QStringLiteral("/aes128-matching-passwords.pdf");
 
     nexpdf::DocumentSession writer;
     QSignalSpy opened(&writer, &nexpdf::DocumentSession::opened);
@@ -237,23 +239,44 @@ void DocumentSessionTests::encryptsAes128WithEmptyUserPassword()
 
     nexpdf::SaveOptions options;
     options.encryption.algorithm = nexpdf::EncryptionAlgorithm::Aes128;
-    options.encryption.ownerPassword = QStringLiteral("owner-aes128");
+    options.encryption.ownerPassword = QStringLiteral("owner-passphrase-123");
     options.encryption.permissions.copy = false;
     options.encryption.permissions.print = false;
+    writer.saveAs(missingUserPath, options);
+    QTRY_COMPARE_WITH_TIMEOUT(failed.size(), 1, 5000);
+    QCOMPARE(qvariant_cast<nexpdf::OperationError>(failed.last().first()).code,
+             nexpdf::ErrorCode::InvalidArgument);
+    QVERIFY(!QFileInfo::exists(missingUserPath));
+
+    options.encryption.userPassword = QStringLiteral("user-passphrase-123");
+    options.encryption.ownerPassword.clear();
+    writer.saveAs(missingOwnerPath, options);
+    QTRY_COMPARE_WITH_TIMEOUT(failed.size(), 2, 5000);
+    QCOMPARE(qvariant_cast<nexpdf::OperationError>(failed.last().first()).code,
+             nexpdf::ErrorCode::InvalidArgument);
+    QVERIFY(!QFileInfo::exists(missingOwnerPath));
+
+    options.encryption.userPassword = QStringLiteral("same-strong-password");
+    options.encryption.ownerPassword = options.encryption.userPassword;
     writer.saveAs(encryptedPath, options);
-    QTRY_VERIFY_WITH_TIMEOUT(saved.size() == 1 || failed.size() == 1, 5000);
-    QVERIFY2(failed.isEmpty(), qPrintable(errorDescription(failed)));
+    QTRY_COMPARE_WITH_TIMEOUT(saved.size(), 1, 5000);
+    QCOMPARE(failed.size(), 2);
 
     nexpdf::DocumentSession reader;
     QSignalSpy readerOpened(&reader, &nexpdf::DocumentSession::opened);
     QSignalSpy passwordRequired(&reader, &nexpdf::DocumentSession::passwordRequired);
     QSignalSpy readerFailed(&reader, &nexpdf::DocumentSession::failed);
     reader.open(encryptedPath);
+    QTRY_COMPARE_WITH_TIMEOUT(passwordRequired.size(), 1, 5000);
+    QCOMPARE(readerOpened.size(), 0);
+
+    nexpdf::OpenOptions password;
+    password.password = QStringLiteral("same-strong-password");
+    reader.open(encryptedPath, password);
     QTRY_VERIFY_WITH_TIMEOUT(!readerOpened.isEmpty() || !readerFailed.isEmpty(), 5000);
     QVERIFY2(readerFailed.isEmpty(), qPrintable(errorDescription(readerFailed)));
-    QCOMPARE(passwordRequired.size(), 0);
     QVERIFY(qvariant_cast<nexpdf::DocumentInfo>(readerOpened.first().first()).encrypted);
-    retainArtifact(encryptedPath, QStringLiteral("aes128-empty-user.pdf"));
+    retainArtifact(encryptedPath, QStringLiteral("aes128-matching-passwords.pdf"));
 }
 
 void DocumentSessionTests::editsPagesAnnotationsAndJournal()
