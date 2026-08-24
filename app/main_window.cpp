@@ -41,6 +41,7 @@
 #include <QSplitter>
 #include <QStatusBar>
 #include <QToolBar>
+#include <QToolButton>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -540,7 +541,20 @@ void MainWindow::buildMenus()
     toolbar->setObjectName(QStringLiteral("mainToolbar"));
     toolbar->setIconSize(QSize(22, 22));
     toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    toolbar->addActions({openAction_, saveAsAction_});
+    const auto addLabeledAction = [](QToolBar *target, QAction *action,
+                                     const QString &objectName, const Qt::ToolButtonStyle style) {
+        auto *button = new QToolButton(target);
+        button->setObjectName(objectName);
+        button->setDefaultAction(action);
+        button->setToolButtonStyle(style);
+        button->setAutoRaise(true);
+        target->addWidget(button);
+        return button;
+    };
+    addLabeledAction(toolbar, openAction_, QStringLiteral("openToolButton"), Qt::ToolButtonTextBesideIcon);
+    addLabeledAction(toolbar, saveAsAction_, QStringLiteral("saveAsToolButton"), Qt::ToolButtonTextBesideIcon);
+    addLabeledAction(toolbar, encryptAction_, QStringLiteral("encryptToolButton"), Qt::ToolButtonTextBesideIcon);
+    addLabeledAction(toolbar, decryptAction_, QStringLiteral("decryptToolButton"), Qt::ToolButtonTextBesideIcon);
     toolbar->addSeparator();
     toolbar->addActions({undoAction_, redoAction_});
     toolbar->addSeparator();
@@ -556,16 +570,24 @@ void MainWindow::buildMenus()
     addToolBarBreak(Qt::TopToolBarArea);
     auto *editToolbar = addToolBar(QStringLiteral("edit"));
     editToolbar->setObjectName(QStringLiteral("editToolbar"));
-    editToolbar->setIconSize(QSize(22, 22));
+    editToolbar->setIconSize(QSize(24, 24));
     editToolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    editToolbar->addActions({importPagesAction_, insertPageAction_, deletePageAction_,
-                             movePageUpAction_, movePageDownAction_, rotateLeftAction_, rotateRightAction_});
+    addLabeledAction(editToolbar, importPagesAction_, QStringLiteral("importPagesToolButton"),
+                     Qt::ToolButtonTextUnderIcon);
+    editToolbar->addActions({insertPageAction_, deletePageAction_, movePageUpAction_, movePageDownAction_,
+                             rotateLeftAction_, rotateRightAction_});
     editToolbar->addSeparator();
-    editToolbar->addActions({addTextAction_, addImageAction_});
+    addLabeledAction(editToolbar, addTextAction_, QStringLiteral("addTextToolButton"),
+                     Qt::ToolButtonTextUnderIcon);
+    addLabeledAction(editToolbar, addImageAction_, QStringLiteral("addImageToolButton"),
+                     Qt::ToolButtonTextUnderIcon);
     editToolbar->addSeparator();
     editToolbar->addActions({highlightAction_, underlineAction_, strikeOutAction_, rectangleAction_,
                              ellipseAction_, inkAction_, moveObjectAction_, resizeObjectAction_,
-                             deleteObjectAction_, redactionPreviewAction_, applyRedactionsAction_});
+                             deleteObjectAction_, redactionPreviewAction_});
+    editToolbar->addSeparator();
+    addLabeledAction(editToolbar, applyRedactionsAction_, QStringLiteral("applyRedactionsToolButton"),
+                     Qt::ToolButtonTextUnderIcon);
 
     retranslateUi();
 }
@@ -720,6 +742,20 @@ void MainWindow::retranslateUi()
     }
     if (QToolBar *toolbar = findChild<QToolBar *>(QStringLiteral("editToolbar"))) {
         toolbar->setWindowTitle(tr("Edit toolbar"));
+    }
+    const QList<QPair<QString, QString>> compactLabels = {
+        {QStringLiteral("openToolButton"), tr("Open")},
+        {QStringLiteral("saveAsToolButton"), tr("Save")},
+        {QStringLiteral("encryptToolButton"), tr("Encrypt")},
+        {QStringLiteral("decryptToolButton"), tr("Decrypt")}
+    };
+    for (const auto &[objectName, label] : compactLabels) {
+        if (QToolButton *button = findChild<QToolButton *>(objectName)) button->setText(label);
+    }
+    if (statusLabel_ != nullptr
+        && (statusLabel_->text() == QStringLiteral("Ready")
+            || statusLabel_->text() == QStringLiteral("就绪"))) {
+        statusLabel_->setText(tr("Ready"));
     }
     if (watermarkDock_ != nullptr) {
         watermarkDock_->setWindowTitle(tr("Watermark"));

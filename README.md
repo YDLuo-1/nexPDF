@@ -18,7 +18,7 @@ nexPDF 是一个本地运行、跨平台的 PDF 查看与实用编辑工具，�
 - 水印：文字或图片水印；精确识别本工具创建的水印；列出外部 Watermark 批注候选并要求逐项确认。
 - 安全保存：写入目标目录临时文件，由 MuPDF 重新打开校验后再原子替换；默认另存为；已签名 PDF 强制保存到新文件。
 - 双语：跟随系统语言，并可在应用中切换简体中文/英文。
-- 界面：高频查看和编辑操作使用一致的矢量风格图标、键盘快捷键与中英文 Tooltip；应用图标覆盖 Windows、Linux 和 macOS 包。
+- 界面：采用混合命令栏——打开、保存、加解密及高理解成本编辑显示图标与短文字，常见导航/批注保持紧凑图标；所有动作提供中英文 Tooltip，应用图标覆盖 Windows、Linux 和 macOS 包。
 
 PDF 权限主要依赖阅读器遵守，不能替代真正的数据访问控制。外部 PDF 可能把水印烘焙进正文、图片或共享 XObject；nexPDF 不保证识别所有此类水印，也不会自动删除启发式候选。请仅处理您拥有权利或已获得授权的文件，并始终保留备份。
 
@@ -54,9 +54,9 @@ Linux/macOS 以及打包步骤见 [构建说明](docs/building.md)。架构与�
 
 - 已在 Windows x64 使用 MSVC 19.44、真实 MuPDF 1.28.2 静态库和本地 Qt 6.10.2 完成 Release 链接；应用、测试和基准目标均已生成。
 - 本地 8 组核心功能用例已覆盖打开、渲染、搜索、选区取文、Unicode 密码 AES-256 加密/解密、空用户密码 AES-128 与权限、页面插入/旋转、文字/图片/墨迹/高亮批注、两阶段永久涂黑、对象两阶段调整、撤销/重做、跨 display-list LRU 淘汰的多页渲染、标准 Watermark 批注的候选确认移除，以及 nexPDF 水印添加、扫描、精确移除和渲染等价；Qt Test 总计 10 项（含初始化/清理）全部通过。
-- 独立 UI 冒烟在 Windows 11、150% DPI 下实例化真实主窗口、打开 PDF、等待主画布瓦片完成，并验证页面未被缩略图结果污染；Qt Test 3 项（含初始化/清理）通过。
+- 独立 UI 冒烟在 Windows 11、150% DPI 下实例化真实主窗口、打开 PDF、等待主画布瓦片完成，检查混合图标/文字按钮和 Tooltip，并在同一用例中生成中英文截图；Qt Test 3 项（含初始化/清理）通过。
 - qpdf 12.4.0 已对解密、编辑、永久涂黑和水印测试输出完成 6 项独立结构检查，并确认 AES-256 使用 R=6/AESv3、AES-128 使用 AESv2 且权限限制生效；Poppler 26.02.0-0 成功渲染编辑与涂黑结果，且原始和去水印文件的参考渲染完全一致。
-- 本地 Qt 6.10.2 Windows 便携验证 ZIP（r6）实测 41.474 MiB，解压后依赖检查和隐藏式 `--version` 冒烟通过；最终用户包不含测试基准程序或 `Qt6Test.dll`。该文件不是正式 Release 资产。
+- 本地 Qt 6.10.2 Windows 便携验证 ZIP（r7）实测 41.478 MiB，解压后依赖检查和隐藏式 `--version` 冒烟通过；最终用户包不含测试基准程序或 `Qt6Test.dll`。该文件不是正式 Release 资产。
 - Qt 6.11.2 在线包在当前镜像索引中不可直接安装；本地编译检查使用兼容的 Qt 6.10.2，正式发布仍锁定 6.11.2。
 - 上述证据仅是 Windows 本地验证，不代表发布检查表已经完成。Qt 6.11.2 三平台构建、复杂语料、完整编辑矩阵、真实 100/300/1000 页性能对比、干净虚拟机和界面截图仍须由 Release CI/人工验收完成。
 
@@ -84,7 +84,7 @@ nexPDF is a local, cross-platform PDF viewer and practical editor built with C++
 - Watermarks: text/image watermarks, exact recognition of nexPDF-created marks, and reviewed candidates for external Watermark annotations.
 - Safe saving: write a sibling temporary file, reopen it with MuPDF, then atomically replace the destination; Save As is the default, and signed PDFs must be saved to a new path.
 - Bilingual UI: follows the system language and can switch between Simplified Chinese and English.
-- Interface: common viewing/editing actions use a consistent vector-style icon set, keyboard shortcuts, and bilingual tooltips; app icons are wired into Windows, Linux, and macOS packages.
+- Interface: a hybrid command bar gives Open/Save, encryption, and higher-comprehension-cost edits an icon plus a short label, while familiar navigation/annotation commands stay compact; every action has bilingual tooltips and app icons are wired into Windows, Linux, and macOS packages.
 
 PDF permissions depend mainly on reader cooperation and are not a substitute for access control. External PDFs may bake watermarks into page content, images, or shared XObjects. nexPDF cannot promise to detect all such marks and never auto-deletes heuristic candidates. Process only files you own or are authorized to modify, and always keep backups.
 
@@ -120,9 +120,9 @@ See [build documentation](docs/building.md) for Linux/macOS and packaging, [arch
 
 - Windows x64 Release binaries for the application, tests, and benchmark have been linked with MSVC 19.44, real MuPDF 1.28.2 static libraries, and the locally available Qt 6.10.2.
 - Eight local core test groups cover open/render/search/selection, AES-256 encryption and decryption with a Unicode password, AES-128 with an empty user password and restricted permissions, page insertion/rotation, text/image/ink/highlight annotations, two-stage permanent redaction, two-stage object adjustment, undo/redo, multi-page rendering across display-list LRU eviction, confirmed removal of a standard Watermark annotation, and nexPDF watermark add/scan/exact removal/render equivalence. Qt Test reports ten passing items including initialization and cleanup.
-- A separate Windows 11 UI smoke at 150% DPI instantiates the real main window, opens a PDF, waits for the main canvas tile, and verifies that thumbnail results cannot shrink the page. Its three Qt Test items, including initialization and cleanup, pass.
+- A separate Windows 11 UI smoke at 150% DPI instantiates the real main window, opens a PDF, waits for the main canvas tile, checks hybrid icon/text buttons and tooltips, and captures both English and Chinese layouts in one case. Its three Qt Test items, including initialization and cleanup, pass.
 - qpdf 12.4.0 independently accepted six decrypted, edited, permanently redacted, and watermarked outputs; it reported R=6/AESv3 for AES-256 and AESv2 with effective permission restrictions for AES-128. Poppler 26.02.0-0 rendered edited/redacted outputs and produced identical reference renders for the original and watermark-restored files.
-- A local Qt 6.10.2 Windows portable validation ZIP (r6) measured 41.474 MiB and passed extracted dependency and hidden `--version` smoke checks. The end-user package contains neither the benchmark executable nor `Qt6Test.dll`; it is not a formal Release asset.
+- A local Qt 6.10.2 Windows portable validation ZIP (r7) measured 41.478 MiB and passed extracted dependency and hidden `--version` smoke checks. The end-user package contains neither the benchmark executable nor `Qt6Test.dll`; it is not a formal Release asset.
 - Qt 6.11.2 could not be installed from the current online mirror index; compatible Qt 6.10.2 was used for the local compile check. Formal releases remain pinned to 6.11.2.
 - This is Windows-local evidence, not completion of the release checklist. Exact-Qt three-platform builds, complex corpora, the complete editing matrix, real 100/300/1000-page performance comparisons, clean-VM checks, and UI screenshots still require Release CI and human acceptance.
 

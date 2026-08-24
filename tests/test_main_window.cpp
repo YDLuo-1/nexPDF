@@ -5,10 +5,12 @@
 #include <QDir>
 #include <QFile>
 #include <QLabel>
+#include <QMenu>
 #include <QPushButton>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QToolBar>
+#include <QToolButton>
 #include <QWidgetAction>
 #include <QtTest>
 
@@ -90,6 +92,25 @@ void MainWindowTests::opensFixtureAndCapturesUi()
             QVERIFY2(!action->toolTip().isEmpty(), qPrintable(action->text()));
         }
     }
+    const QList<QPair<QString, Qt::ToolButtonStyle>> labeledTools = {
+        {QStringLiteral("openToolButton"), Qt::ToolButtonTextBesideIcon},
+        {QStringLiteral("saveAsToolButton"), Qt::ToolButtonTextBesideIcon},
+        {QStringLiteral("encryptToolButton"), Qt::ToolButtonTextBesideIcon},
+        {QStringLiteral("decryptToolButton"), Qt::ToolButtonTextBesideIcon},
+        {QStringLiteral("importPagesToolButton"), Qt::ToolButtonTextUnderIcon},
+        {QStringLiteral("addTextToolButton"), Qt::ToolButtonTextUnderIcon},
+        {QStringLiteral("addImageToolButton"), Qt::ToolButtonTextUnderIcon},
+        {QStringLiteral("applyRedactionsToolButton"), Qt::ToolButtonTextUnderIcon}
+    };
+    for (const auto &[name, style] : labeledTools) {
+        auto *button = window.findChild<QToolButton *>(name);
+        QVERIFY2(button != nullptr, qPrintable(name));
+        QCOMPARE(button->toolButtonStyle(), style);
+        QVERIFY(button->defaultAction() != nullptr);
+        QVERIFY(!button->text().isEmpty());
+        QVERIFY(!button->icon().isNull());
+        QVERIFY(!button->toolTip().isEmpty());
+    }
     for (const QString &name : {QStringLiteral("addTextWatermarkButton"),
                                 QStringLiteral("addImageWatermarkButton"),
                                 QStringLiteral("scanWatermarkButton"),
@@ -109,13 +130,32 @@ void MainWindowTests::opensFixtureAndCapturesUi()
     QTRY_VERIFY_WITH_TIMEOUT(canvas->hasRenderedContent(), 10000);
     QTest::qWait(500);
 
-    const QPixmap screenshot = window.grab();
-    QVERIFY(!screenshot.isNull());
-    QCOMPARE(screenshot.deviceIndependentSize(), QSizeF(window.size()));
+    const QPixmap englishScreenshot = window.grab();
+    QVERIFY(!englishScreenshot.isNull());
+    QCOMPARE(englishScreenshot.deviceIndependentSize(), QSizeF(window.size()));
     const QString output = qEnvironmentVariable("NEXPDF_TEST_OUTPUT_DIR");
     if (!output.isEmpty()) {
         QVERIFY(QDir().mkpath(output));
-        QVERIFY(screenshot.save(output + QStringLiteral("/ui-main-window.png")));
+        QVERIFY(englishScreenshot.save(output + QStringLiteral("/ui-main-window-en.png")));
+    }
+
+    QAction *chineseAction = nullptr;
+    for (QAction *action : window.findChildren<QAction *>()) {
+        if (action->text() == QStringLiteral("简体中文")) {
+            chineseAction = action;
+            break;
+        }
+    }
+    QVERIFY(chineseAction != nullptr);
+    chineseAction->trigger();
+    auto *fileMenu = window.findChild<QMenu *>(QStringLiteral("fileMenu"));
+    QVERIFY(fileMenu != nullptr);
+    QTRY_COMPARE(fileMenu->title(), QStringLiteral("文件"));
+    const QPixmap chineseScreenshot = window.grab();
+    QVERIFY(!chineseScreenshot.isNull());
+    QCOMPARE(chineseScreenshot.deviceIndependentSize(), QSizeF(window.size()));
+    if (!output.isEmpty()) {
+        QVERIFY(chineseScreenshot.save(output + QStringLiteral("/ui-main-window.png")));
     }
 }
 

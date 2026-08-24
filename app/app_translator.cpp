@@ -6,6 +6,7 @@ AppTranslator::AppTranslator(QObject *parent) : QTranslator(parent)
 {
     const std::pair<const char *, const char *> entries[] = {
         {"File", "文件"}, {"Open…", "打开…"}, {"Save As…", "另存为…"},
+        {"Open", "打开"}, {"Save", "保存"}, {"Encrypt", "加密"}, {"Decrypt", "解密"},
         {"Create encrypted copy…", "创建加密副本…"}, {"Create decrypted copy…", "创建解密副本…"},
         {"Close", "关闭"}, {"Exit", "退出"}, {"Edit", "编辑"}, {"Undo", "撤销"},
         {"Redo", "重做"}, {"Insert blank page", "插入空白页"}, {"Delete page", "删除页面"},
