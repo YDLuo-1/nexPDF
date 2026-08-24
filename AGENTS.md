@@ -35,11 +35,13 @@
 7. macOS Universal 的 MuPDF 必须分别生成 arm64 与 x86_64 静态库，再用 `lipo` 合并。MuPDF Makefile 的 `ARCHFLAGS` 不会自动进入所有 C 编译命令，架构参数还必须通过 `XCFLAGS` 传入；合并前后都要用 `lipo -info` 验证每个静态库，不能只根据输出目录名判断架构。
 8. MuPDF Makefile 的 `build=` 只接受其支持的构建类型，架构差异放在独立 `OUT` 目录中。不得把 `release-arm64` 一类自定义目录名误当成合法 `build` 类型。
 9. 工作线程中的 `QObject` 不得在以自身为接收者的事件处理中直接 `delete`。按 Qt 推荐模式把 `QThread::finished` 连接到 `QObject::deleteLater`，退出前先阻塞完成文档关闭和渲染池清理。
-10. GitHub HTTPS 偶发 TLS 握手中断时，只重试同一提交，可临时尝试 HTTP/1.1；不得把访问令牌写进远程 URL、命令或日志，也不得因重试重复创建内容相同的提交。
+10. 设置 `MUPDF_ROOT` 后，`FindMuPDF.cmake` 必须使用 `NO_DEFAULT_PATH` 查找 MuPDF 及其拆分组件。不得在指定前缀缺少可选库时回退到全系统搜索，否则会把 Homebrew 的单架构 HarfBuzz/PKCS7 混入 macOS Universal 链接。
+11. MuPDF 静态库必须排在 QtGui 之前链接。macOS LLDB 已证明反向顺序会让 MuPDF 的 `FT_Load_Glyph` 跳进 QtGui 内部另一套 FreeType 实现并崩溃；调整 CMake 链接依赖后必须检查实际链接命令，不能只看 `target_link_libraries` 源码顺序。
+12. GitHub HTTPS 偶发 TLS 握手中断时，只重试同一提交，可临时尝试 HTTP/1.1；不得把访问令牌写进远程 URL、命令或日志，也不得因重试重复创建内容相同的提交。
 
 ### 当前未解决项
 
-- 截至 2026-08-24，macOS Universal 的 `nexpdf_core_tests` 仍在 `opensRendersAndSearches` 的首次正常渲染期间发生 SIGSEGV；LLDB 已确认崩溃线程为 `nexPDF document thread`，顶部地址位于 QtGui。Linux、Windows 和 macOS UI 测试不复现。线程对象直接删除的风险已经修复，但事实证明它不是该崩溃的原因。下一步必须取得崩溃时的完整线程回溯后再修改核心逻辑，禁止跳过该测试、标记允许失败或宣称 macOS 已通过。
+- 截至 2026-08-24，macOS Universal 的 `nexpdf_core_tests` 曾在首次正常渲染期间 SIGSEGV。完整回溯为 `pdf_load_simple_font -> FT_Get_Advance -> FT_Load_Glyph -> QtGui`，并且链接日志确认误混入 Homebrew arm64 HarfBuzz/PKCS7。限定 MuPDF 搜索前缀并把 MuPDF 静态库移到 QtGui 前的修复尚待下一轮 macOS Actions 实证；通过前禁止跳过测试、标记允许失败或宣称 macOS 已修复。
 
 ## 发布纪律
 

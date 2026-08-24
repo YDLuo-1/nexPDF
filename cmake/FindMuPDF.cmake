@@ -12,21 +12,27 @@ endif()
 if(DEFINED ENV{MUPDF_ROOT})
   list(APPEND _mupdf_hints "$ENV{MUPDF_ROOT}")
 endif()
+if(_mupdf_hints)
+  set(_mupdf_search_scope NO_DEFAULT_PATH)
+endif()
 
 find_path(MuPDF_INCLUDE_DIR
   NAMES mupdf/fitz.h
   HINTS ${_mupdf_hints}
-  PATH_SUFFIXES include)
+  PATH_SUFFIXES include
+  ${_mupdf_search_scope})
 
 find_library(MuPDF_LIBRARY
   NAMES mupdf libmupdf
   HINTS ${_mupdf_hints}
-  PATH_SUFFIXES lib lib64 platform/win32/x64/Release)
+  PATH_SUFFIXES lib lib64 platform/win32/x64/Release
+  ${_mupdf_search_scope})
 
 find_library(MuPDF_THIRD_LIBRARY
   NAMES mupdf-third thirdparty libthirdparty
   HINTS ${_mupdf_hints}
-  PATH_SUFFIXES lib lib64 platform/win32/x64/Release)
+  PATH_SUFFIXES lib lib64 platform/win32/x64/Release
+  ${_mupdf_search_scope})
 
 set(_mupdf_extra_libraries)
 foreach(_component IN ITEMS resources harfbuzz pkcs7)
@@ -34,7 +40,8 @@ foreach(_component IN ITEMS resources harfbuzz pkcs7)
   find_library(MuPDF_${_component_upper}_LIBRARY
     NAMES "mupdf-${_component}" "lib${_component}" "${_component}"
     HINTS ${_mupdf_hints}
-    PATH_SUFFIXES lib lib64 platform/win32/x64/Release)
+    PATH_SUFFIXES lib lib64 platform/win32/x64/Release
+    ${_mupdf_search_scope})
   if(MuPDF_${_component_upper}_LIBRARY)
     list(APPEND _mupdf_extra_libraries "${MuPDF_${_component_upper}_LIBRARY}")
   endif()

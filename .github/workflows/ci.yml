@@ -36,7 +36,7 @@ jobs:
             aqt_source: ""
           - name: macOS Universal
             os: macos-15
-            build_type: RelWithDebInfo
+            build_type: Release
             qt_arch: clang_64
             qt_archives: qtbase
             aqt_source: ""
@@ -130,15 +130,6 @@ jobs:
         run: |
           $env:NEXPDF_TEST_OUTPUT_DIR = "$env:RUNNER_TEMP/nexpdf-test-output"
           ctest --test-dir build/ci -C Release --output-on-failure
-
-      - name: Diagnose macOS core crash
-        if: runner.os == 'macOS'
-        continue-on-error: true
-        shell: bash
-        run: >-
-          QT_QPA_PLATFORM=offscreen lldb --batch
-          -o run -k 'image lookup -a $pc' -k 'thread backtrace all'
-          -- build/ci/tests/nexpdf_core_tests opensRendersAndSearches -v2
 
       - name: Test Unix
         if: runner.os != 'Windows'

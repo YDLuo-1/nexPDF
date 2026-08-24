@@ -11,8 +11,8 @@ target_include_directories(nexpdf_core
   PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 target_link_libraries(nexpdf_core
-  PUBLIC Qt6::Core Qt6::Gui
-  PRIVATE MuPDF::MuPDF)
+  PRIVATE MuPDF::MuPDF
+  PUBLIC Qt6::Core Qt6::Gui)
 
 target_compile_definitions(nexpdf_core
   PUBLIC NEXPDF_VERSION="${PROJECT_VERSION}"
