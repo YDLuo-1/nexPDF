@@ -59,7 +59,13 @@ jobs:
       - name: Install Windows validators
         if: runner.os == 'Windows'
         shell: pwsh
-        run: choco install qpdf poppler --yes --no-progress
+        run: |
+          choco install qpdf poppler --yes --no-progress
+          $pdftoppm = Get-ChildItem "$env:ChocolateyInstall/lib/poppler/tools" `
+            -Filter pdftoppm.exe -File -Recurse | Select-Object -First 1
+          if ($null -eq $pdftoppm) { throw "Chocolatey Poppler did not provide pdftoppm.exe" }
+          $pdftoppm.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          & $pdftoppm.FullName -v
 
       - name: Install Linux validators
         if: runner.os == 'Linux'

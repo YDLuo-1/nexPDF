@@ -2120,6 +2120,8 @@ DocumentSession::DocumentSession(QObject *parent)
 
     documentThread_.setObjectName(QStringLiteral("nexPDF document thread"));
     workerContext_->moveToThread(&documentThread_);
+    connect(&documentThread_, &QThread::finished,
+            workerContext_, &QObject::deleteLater);
     documentThread_.start();
     QMetaObject::invokeMethod(workerContext_, [this] { impl_->initialize(); },
                               Qt::BlockingQueuedConnection);
@@ -2129,9 +2131,6 @@ DocumentSession::~DocumentSession()
 {
     if (documentThread_.isRunning()) {
         QMetaObject::invokeMethod(workerContext_, [this] { impl_->closeDocument(false); },
-                                  Qt::BlockingQueuedConnection);
-        QObject *context = workerContext_;
-        QMetaObject::invokeMethod(context, [context] { delete context; },
                                   Qt::BlockingQueuedConnection);
         workerContext_ = nullptr;
         documentThread_.quit();
