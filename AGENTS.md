@@ -38,14 +38,24 @@
 10. 设置 `MUPDF_ROOT` 后，`FindMuPDF.cmake` 必须使用 `NO_DEFAULT_PATH` 查找 MuPDF 及其拆分组件。不得在指定前缀缺少可选库时回退到全系统搜索，否则会把 Homebrew 的单架构 HarfBuzz/PKCS7 混入 macOS Universal 链接。
 11. MuPDF 静态库必须排在 QtGui 之前链接。macOS LLDB 已证明反向顺序会让 MuPDF 的 `FT_Load_Glyph` 跳进 QtGui 内部另一套 FreeType 实现并崩溃；调整 CMake 链接依赖后必须检查实际链接命令，不能只看 `target_link_libraries` 源码顺序。
 12. GitHub HTTPS 偶发 TLS 握手中断时，只重试同一提交，可临时尝试 HTTP/1.1；不得把访问令牌写进远程 URL、命令或日志，也不得因重试重复创建内容相同的提交。
+13. Windows 执行 `windeployqt --translations` 时会调用 `lconvert.exe`。Release 的 Qt 归档必须包含 `qttools`，并在部署前确认 `lconvert.exe` 存在；`qttranslations` 下载成功不代表翻译部署工具齐全。`qttools` 只用于打包环境，不得因此把 QtTools 开发 DLL 混入用户包。
 
-### 当前未解决项
+### 已解决但必须保留回归
 
-- 截至 2026-08-24，macOS Universal 的 `nexpdf_core_tests` 曾在首次正常渲染期间 SIGSEGV。完整回溯为 `pdf_load_simple_font -> FT_Get_Advance -> FT_Load_Glyph -> QtGui`，并且链接日志确认误混入 Homebrew arm64 HarfBuzz/PKCS7。限定 MuPDF 搜索前缀并把 MuPDF 静态库移到 QtGui 前的修复尚待下一轮 macOS Actions 实证；通过前禁止跳过测试、标记允许失败或宣称 macOS 已修复。
+- macOS Universal 的 `nexpdf_core_tests` 曾在首次正常渲染期间 SIGSEGV。完整回溯为 `pdf_load_simple_font -> FT_Get_Advance -> FT_Load_Glyph -> QtGui`，链接日志同时确认误混入 Homebrew arm64 HarfBuzz/PKCS7。限定 MuPDF 搜索前缀并把 MuPDF 静态库移到 QtGui 前后，CI 运行 `32702657572` 的 macOS 核心/UI 测试、独立校验和冒烟已全部通过；这些链接约束和字体渲染测试不得删除。
+- `v1.0.0-rc.1` 的 Linux、macOS、源码资产构建成功，但 Windows 在翻译部署阶段因缺少 `lconvert.exe` 失败，发布步骤按设计被阻止，没有生成不完整 Release。后续版本必须保留 `qttools` 打包依赖和四类 job 全成功后才能发布的门槛。
+
+## 界面、密码与目录维护注意事项
+
+1. 工具栏不得走“全部文字”或“全部图标”两个极端。打开、保存、撤销、缩放等高频且图形语义明确的动作可使用图标并始终提供 tooltip；加密、解密、水印、涂黑等业务动作使用图标加短文字；相关动作分组并保留菜单中的完整名称和快捷键。
+2. 应用图标不是可选装饰。Windows EXE、窗口标题栏、任务栏以及安装包必须使用同一套 nexPDF 品牌资源；替换图标后要检查高 DPI、小尺寸可辨识度和发布包资源，不能只检查开发窗口。
+3. 新建加密文件只提供 AES-256 和 AES-128，不创建 RC4。用户密码和所有者密码都必须非空并分别确认；允许两者相同，但要提示部分阅读器可能优先按用户身份打开，影响所有者权限操作。不得把“密码相同”误判为 AES 强度下降。
+4. 密码不得写入日志、异常文本、命令行或长生命周期的不可清理字符串。临时 UTF-8 缓冲区、保存参数和会话缓存用完后必须覆盖清理；修改密码逻辑后至少覆盖空密码、相同密码、Unicode、错误密码、权限组合、解密重开和 qpdf 独立检查。
+5. Qt、CMake、MuPDF 构建产物和下载缓存不得重新塞进源码目录形成第二套工具链。用户机器统一使用 `D:\Qt\6.11.2\msvc2022_64`；机器相关路径只放在被 Git 忽略的用户预设中。清理目录前先核对绝对路径和用途，只删除可再生成的构建/下载缓存，保留源码、测试语料、发布资产和用户改动。
 
 ## 发布纪律
 
 1. 创建标签前必须确认目标提交的三平台 CI 全部通过、工作树干净、对应 `docs/release-notes/<tag>.md` 已存在。
-2. 正式 `v1.0.0`/Latest 还需要计划规定的人工界面检查和完整性能验收。仅自动化和打包通过时先发布 `v1.0.0-rc.1` 预发行版，不得提前降低门槛或把 RC 标成 Latest。
+2. 正式 `v1.0.0`/Latest 还需要计划规定的人工界面检查和完整性能验收。仅自动化和打包通过时发布递增的 `v1.0.0-rc.N` 预发行版，不得提前降低门槛或把 RC 标成 Latest。
 3. 发布工作流必须在 Windows、Linux、macOS 和完整源码包四项都成功后再创建 Release；任何平台失败都不得手工拼凑成“完整三平台发布”。
 4. Windows 最终资产应同时提供便携 ZIP 和安装程序 EXE。便携版不能是孤立单 EXE，因为 Qt DLL 与平台插件属于必需运行时；测试程序、benchmark 和 `Qt6Test.dll` 不得进入最终用户包。

@@ -4,6 +4,10 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] - 2026-08-24
+
+- Add the Qt Tools archive required by Windows translation deployment; RC.1 produced no incomplete GitHub Release.
+
 ## [1.0.0-rc.1] - 2026-08-24
 
 - Initial C++20/Qt/MuPDF architecture and public domain types.

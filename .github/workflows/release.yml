@@ -31,7 +31,7 @@ jobs:
         with:
           version: 6.11.2
           arch: win64_msvc2022_64
-          archives: qtbase qttranslations
+          archives: qtbase qttools qttranslations
           aqtsource: git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b
           cache: true
       - name: Install packaging tools
