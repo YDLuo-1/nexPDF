@@ -37,12 +37,20 @@ jobs:
       - name: Install packaging tools
         shell: pwsh
         run: |
-          choco install nsis qpdf poppler --yes --no-progress
-          $pdftoppm = Get-ChildItem "$env:ChocolateyInstall/lib/poppler/tools" `
-            -Filter pdftoppm.exe -File -Recurse | Select-Object -First 1
-          if ($null -eq $pdftoppm) { throw "Chocolatey Poppler did not provide pdftoppm.exe" }
-          $pdftoppm.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          & $pdftoppm.FullName -v
+          choco install nsis qpdf --yes --no-progress
+          $archive = "$env:RUNNER_TEMP/poppler-windows.zip"
+          $popplerRoot = "$env:RUNNER_TEMP/poppler-windows"
+          curl.exe --fail --silent --show-error --location `
+            https://github.com/oschwartz10612/poppler-windows/releases/download/v26.02.0-0/Release-26.02.0-0.zip `
+            --output $archive
+          if ($LASTEXITCODE -ne 0) { throw "Unable to download the pinned Poppler package" }
+          $expected = "993E4A94376ED712FAFC7058D724EA0B943D118BBD2305CD9ED55174EB85CDA5"
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne $expected) { throw "Poppler checksum mismatch" }
+          Expand-Archive $archive -DestinationPath $popplerRoot
+          $popplerBin = "$popplerRoot/poppler-26.02.0/Library/bin"
+          if (-not (Test-Path "$popplerBin/pdftoppm.exe")) { throw "Poppler did not provide pdftoppm.exe" }
+          $popplerBin | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          & "$popplerBin/pdftoppm.exe" -v
       - name: Locate Visual C++ runtime
         shell: pwsh
         run: |

@@ -24,16 +24,19 @@ jobs:
         include:
           - name: Windows x64
             os: windows-2022
+            build_type: Release
             qt_arch: win64_msvc2022_64
             qt_archives: qtbase
             aqt_source: git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b
           - name: Linux x86_64
             os: ubuntu-24.04
+            build_type: Release
             qt_arch: linux_gcc_64
             qt_archives: icu qtbase
             aqt_source: ""
           - name: macOS Universal
             os: macos-15
+            build_type: RelWithDebInfo
             qt_arch: clang_64
             qt_archives: qtbase
             aqt_source: ""
@@ -60,12 +63,20 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install qpdf poppler --yes --no-progress
-          $pdftoppm = Get-ChildItem "$env:ChocolateyInstall/lib/poppler/tools" `
-            -Filter pdftoppm.exe -File -Recurse | Select-Object -First 1
-          if ($null -eq $pdftoppm) { throw "Chocolatey Poppler did not provide pdftoppm.exe" }
-          $pdftoppm.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          & $pdftoppm.FullName -v
+          choco install qpdf --yes --no-progress
+          $archive = "$env:RUNNER_TEMP/poppler-windows.zip"
+          $popplerRoot = "$env:RUNNER_TEMP/poppler-windows"
+          curl.exe --fail --silent --show-error --location `
+            https://github.com/oschwartz10612/poppler-windows/releases/download/v26.02.0-0/Release-26.02.0-0.zip `
+            --output $archive
+          if ($LASTEXITCODE -ne 0) { throw "Unable to download the pinned Poppler package" }
+          $expected = "993E4A94376ED712FAFC7058D724EA0B943D118BBD2305CD9ED55174EB85CDA5"
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne $expected) { throw "Poppler checksum mismatch" }
+          Expand-Archive $archive -DestinationPath $popplerRoot
+          $popplerBin = "$popplerRoot/poppler-26.02.0/Library/bin"
+          if (-not (Test-Path "$popplerBin/pdftoppm.exe")) { throw "Poppler did not provide pdftoppm.exe" }
+          $popplerBin | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          & "$popplerBin/pdftoppm.exe" -v
 
       - name: Install Linux validators
         if: runner.os == 'Linux'
@@ -104,7 +115,7 @@ jobs:
           NEXPDF_OSX_ARCHS: ${{ runner.os == 'macOS' && 'arm64;x86_64' || '' }}
         run: >-
           cmake -S . -B build/ci -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
           -DMUPDF_ROOT="$RUNNER_TEMP/mupdf-prefix"
           -DNEXPDF_BUILD_BENCHMARKS=ON
@@ -119,6 +130,15 @@ jobs:
         run: |
           $env:NEXPDF_TEST_OUTPUT_DIR = "$env:RUNNER_TEMP/nexpdf-test-output"
           ctest --test-dir build/ci -C Release --output-on-failure
+
+      - name: Diagnose macOS core crash
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        shell: bash
+        run: >-
+          QT_QPA_PLATFORM=offscreen lldb --batch
+          -o run -o "thread backtrace all"
+          -- build/ci/tests/nexpdf_core_tests opensRendersAndSearches -v2
 
       - name: Test Unix
         if: runner.os != 'Windows'
