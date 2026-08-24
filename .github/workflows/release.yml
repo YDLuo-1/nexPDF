@@ -31,7 +31,6 @@ jobs:
         with:
           version: 6.11.2
           arch: win64_msvc2022_64
-          archives: qtbase qttranslations
           cache: true
       - name: Install packaging tools
         shell: pwsh
@@ -127,7 +126,6 @@ jobs:
         with:
           version: 6.11.2
           arch: linux_gcc_64
-          archives: qtbase qttranslations
           cache: true
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y ninja-build libfuse2 file qpdf poppler-utils
@@ -154,7 +152,7 @@ jobs:
           qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
           encryption="$(qpdf '--password=用户-123' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf")"
           grep -q 'file encryption method: AESv3' <<<"$encryption"
-          aes128="$(qpdf '--password=' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes128-empty-user.pdf")"
+          aes128="$(qpdf '--password=same-strong-password' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes128-matching-passwords.pdf")"
           grep -q 'file encryption method: AESv2' <<<"$aes128"
           grep -q 'extract for any purpose: not allowed' <<<"$aes128"
           grep -q 'print high resolution: not allowed' <<<"$aes128"
@@ -204,7 +202,6 @@ jobs:
         with:
           version: 6.11.2
           arch: clang_64
-          archives: qtbase qttranslations
           cache: true
       - name: Build Universal app
         env:
@@ -235,7 +232,7 @@ jobs:
           qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
           encryption="$(qpdf '--password=用户-123' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf")"
           grep -q 'file encryption method: AESv3' <<<"$encryption"
-          aes128="$(qpdf '--password=' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes128-empty-user.pdf")"
+          aes128="$(qpdf '--password=same-strong-password' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes128-matching-passwords.pdf")"
           grep -q 'file encryption method: AESv2' <<<"$aes128"
           grep -q 'extract for any purpose: not allowed' <<<"$aes128"
           grep -q 'print high resolution: not allowed' <<<"$aes128"

@@ -46,7 +46,6 @@ jobs:
         with:
           version: 6.11.2
           arch: ${{ matrix.qt_arch }}
-          archives: qtbase
           cache: true
 
       - name: Install Windows validators
@@ -124,7 +123,7 @@ jobs:
           qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
           $encryption = qpdf '--password=用户-123' --show-encryption "$env:RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf"
           if ($LASTEXITCODE -ne 0 -or -not ($encryption -match 'file encryption method: AESv3')) { throw "AES-256 independent validation failed" }
-          $aes128 = qpdf '--password=' --show-encryption "$env:RUNNER_TEMP/nexpdf-test-output/aes128-empty-user.pdf"
+          $aes128 = qpdf '--password=same-strong-password' --show-encryption "$env:RUNNER_TEMP/nexpdf-test-output/aes128-matching-passwords.pdf"
           if ($LASTEXITCODE -ne 0 -or -not ($aes128 -match 'file encryption method: AESv2') -or -not ($aes128 -match 'extract for any purpose: not allowed') -or -not ($aes128 -match 'print high resolution: not allowed')) { throw "AES-128 permissions validation failed" }
           pdftoppm -png -f 1 -singlefile "$env:RUNNER_TEMP/nexpdf-test-output/edited.pdf" "$env:RUNNER_TEMP/edited"
           if (-not (Test-Path "$env:RUNNER_TEMP/edited.png")) { throw "Poppler did not render the edited PDF" }
@@ -148,7 +147,7 @@ jobs:
           qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
           encryption="$(qpdf '--password=用户-123' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf")"
           grep -q 'file encryption method: AESv3' <<<"$encryption"
-          aes128="$(qpdf '--password=' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes128-empty-user.pdf")"
+          aes128="$(qpdf '--password=same-strong-password' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes128-matching-passwords.pdf")"
           grep -q 'file encryption method: AESv2' <<<"$aes128"
           grep -q 'extract for any purpose: not allowed' <<<"$aes128"
           grep -q 'print high resolution: not allowed' <<<"$aes128"
