@@ -1,0 +1,324 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to package
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          submodules: recursive
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: jurplel/install-qt-action@v4.3.1
+        with:
+          version: 6.11.2
+          arch: win64_msvc2022_64
+          archives: qtbase qttranslations
+          cache: true
+      - name: Install packaging tools
+        shell: pwsh
+        run: choco install nsis qpdf poppler --yes --no-progress
+      - name: Locate Visual C++ runtime
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $visualStudio = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $visualStudio) { throw "Visual Studio C++ tools not found" }
+          "VCINSTALLDIR=$visualStudio/VC/" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Build MuPDF and nexPDF
+        shell: pwsh
+        run: |
+          tools/Build-MuPDFWindows.ps1 -Configuration Release
+          cmake -S . -B build/release -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" `
+            -DMUPDF_ROOT="$pwd/out/mupdf-windows-x64"
+          cmake --build build/release --config Release --parallel 3
+          $env:NEXPDF_TEST_OUTPUT_DIR = "$env:RUNNER_TEMP/nexpdf-test-output"
+          ctest --test-dir build/release -C Release --output-on-failure
+          cmake --install build/release --config Release --prefix "$pwd/stage"
+      - name: Independently validate generated PDFs
+        shell: pwsh
+        run: |
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/edited.pdf"
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf"
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
+          $encryption = qpdf '--password=用户-123' --show-encryption "$env:RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf"
+          if ($LASTEXITCODE -ne 0 -or -not ($encryption -match 'file encryption method: AESv3')) { throw "AES-256 independent validation failed" }
+          $aes128 = qpdf '--password=' --show-encryption "$env:RUNNER_TEMP/nexpdf-test-output/aes128-empty-user.pdf"
+          if ($LASTEXITCODE -ne 0 -or -not ($aes128 -match 'file encryption method: AESv2') -or -not ($aes128 -match 'extract for any purpose: not allowed') -or -not ($aes128 -match 'print high resolution: not allowed')) { throw "AES-128 permissions validation failed" }
+          pdftoppm -png -f 1 -singlefile "$env:RUNNER_TEMP/nexpdf-test-output/edited.pdf" "$env:RUNNER_TEMP/edited"
+          if (-not (Test-Path "$env:RUNNER_TEMP/edited.png")) { throw "Poppler did not render the edited PDF" }
+          pdftoppm -png -f 1 -singlefile "$env:RUNNER_TEMP/nexpdf-test-output/redacted.pdf" "$env:RUNNER_TEMP/redacted"
+          if (-not (Test-Path "$env:RUNNER_TEMP/redacted.png")) { throw "Poppler did not render the redacted PDF" }
+          pdftoppm -png -f 1 -singlefile "$env:RUNNER_TEMP/nexpdf-test-output/watermark-original.pdf" "$env:RUNNER_TEMP/original"
+          pdftoppm -png -f 1 -singlefile "$env:RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf" "$env:RUNNER_TEMP/marked"
+          pdftoppm -png -f 1 -singlefile "$env:RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf" "$env:RUNNER_TEMP/restored"
+          if ((Get-FileHash "$env:RUNNER_TEMP/original.png").Hash -eq (Get-FileHash "$env:RUNNER_TEMP/marked.png").Hash) { throw "Watermark was not rendered by Poppler" }
+          if ((Get-FileHash "$env:RUNNER_TEMP/original.png").Hash -ne (Get-FileHash "$env:RUNNER_TEMP/restored.png").Hash) { throw "Poppler render mismatch" }
+      - name: Deploy Qt and smoke test
+        shell: pwsh
+        run: |
+          & "$env:QT_ROOT_DIR/bin/windeployqt.exe" --release --translations en,zh_CN `
+            --no-system-d3d-compiler --no-system-dxc-compiler --no-compiler-runtime `
+            --skip-plugin-types generic,networkinformation,tls `
+            "$pwd/stage/bin/nexPDF.exe"
+          $crtDirectory = Get-ChildItem -LiteralPath "$env:VCINSTALLDIR/Redist/MSVC" -Recurse -Directory |
+            Where-Object { $_.FullName -match '\\x64\\Microsoft\.VC\d+\.CRT$' -and $_.FullName -notmatch '\\onecore\\' } |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $crtDirectory) { throw "Redistributable Visual C++ runtime directory not found" }
+          Get-ChildItem -LiteralPath $crtDirectory.FullName -Filter '*.dll' -File |
+            Copy-Item -Destination "$pwd/stage/bin"
+          @("Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll", "platforms/qwindows.dll", "msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "vcruntime140.dll", "vcruntime140_1.dll") | ForEach-Object {
+            if (-not (Test-Path "$pwd/stage/bin/$_")) { throw "Missing deployed runtime: $_" }
+          }
+          $process = Start-Process -FilePath "$pwd/stage/bin/nexPDF.exe" -ArgumentList '--version' -PassThru -WindowStyle Hidden
+          if (-not $process.WaitForExit(10000)) { $process.Kill(); throw "nexPDF --version timed out" }
+          if ($process.ExitCode -ne 0) { throw "nexPDF --version exited with $($process.ExitCode)" }
+      - name: Package ZIP and setup.exe
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $version = $env:RELEASE_TAG.TrimStart('v')
+          Compress-Archive -Path stage/* -DestinationPath "dist/nexPDF-$($env:RELEASE_TAG)-windows-x64-portable.zip"
+          & "${env:ProgramFiles(x86)}/NSIS/makensis.exe" `
+            "/DINPUT_DIR=$pwd\stage" `
+            "/DOUTPUT_FILE=$pwd\dist\nexPDF-$($env:RELEASE_TAG)-windows-x64-setup.exe" `
+            "/DVERSION=$version" packaging/windows/installer.nsi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-assets
+          path: dist/*
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          submodules: recursive
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: jurplel/install-qt-action@v4.3.1
+        with:
+          version: 6.11.2
+          arch: linux_gcc_64
+          archives: qtbase qttranslations
+          cache: true
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libfuse2 file qpdf poppler-utils
+      - name: Build and test
+        env:
+          NEXPDF_BUILD_JOBS: "3"
+          NEXPDF_MACOS_UNIVERSAL: "0"
+        run: |
+          bash tools/build_mupdf_unix.sh "$RUNNER_TEMP/mupdf-prefix"
+          cmake -S . -B build/release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DMUPDF_ROOT="$RUNNER_TEMP/mupdf-prefix"
+          cmake --build build/release --parallel 3
+          NEXPDF_TEST_OUTPUT_DIR="$RUNNER_TEMP/nexpdf-test-output" ctest --test-dir build/release --output-on-failure
+          cmake --install build/release --prefix "$PWD/AppDir/usr"
+      - name: Independently validate generated PDFs
+        run: |
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/edited.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
+          encryption="$(qpdf '--password=用户-123' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf")"
+          grep -q 'file encryption method: AESv3' <<<"$encryption"
+          aes128="$(qpdf '--password=' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes128-empty-user.pdf")"
+          grep -q 'file encryption method: AESv2' <<<"$aes128"
+          grep -q 'extract for any purpose: not allowed' <<<"$aes128"
+          grep -q 'print high resolution: not allowed' <<<"$aes128"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/edited.pdf" "$RUNNER_TEMP/edited"
+          test -s "$RUNNER_TEMP/edited.png"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf" "$RUNNER_TEMP/redacted"
+          test -s "$RUNNER_TEMP/redacted.png"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/watermark-original.pdf" "$RUNNER_TEMP/original"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf" "$RUNNER_TEMP/marked"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf" "$RUNNER_TEMP/restored"
+          ! cmp -s "$RUNNER_TEMP/original.png" "$RUNNER_TEMP/marked.png"
+          cmp "$RUNNER_TEMP/original.png" "$RUNNER_TEMP/restored.png"
+      - name: Build AppImage
+        env:
+          QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+        run: |
+          curl -fsSLO https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          curl -fsSLO https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage \
+            --desktop-file packaging/linux/org.nexpdf.desktop.desktop \
+            --icon-file app/assets/org.nexpdf.desktop.svg
+          mkdir -p dist
+          mv nexPDF*.AppImage "dist/nexPDF-$RELEASE_TAG-linux-x86_64.AppImage"
+          chmod +x "dist/nexPDF-$RELEASE_TAG-linux-x86_64.AppImage"
+          "dist/nexPDF-$RELEASE_TAG-linux-x86_64.AppImage" --appimage-extract-and-run --version
+      - name: Preserve executable AppImage in tar artifact
+        run: tar -C dist -czf "nexPDF-$RELEASE_TAG-linux-asset.tar.gz" "nexPDF-$RELEASE_TAG-linux-x86_64.AppImage"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-assets
+          path: nexPDF-${{ env.RELEASE_TAG }}-linux-asset.tar.gz
+          archive: false
+
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          submodules: recursive
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: jurplel/install-qt-action@v4.3.1
+        with:
+          version: 6.11.2
+          arch: clang_64
+          archives: qtbase qttranslations
+          cache: true
+      - name: Build Universal app
+        env:
+          NEXPDF_BUILD_JOBS: "3"
+          NEXPDF_MACOS_UNIVERSAL: "1"
+        run: |
+          brew install ninja qpdf poppler
+          bash tools/build_mupdf_unix.sh "$RUNNER_TEMP/mupdf-prefix"
+          cmake -S . -B build/release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DMUPDF_ROOT="$RUNNER_TEMP/mupdf-prefix"
+          cmake --build build/release --parallel 3
+          NEXPDF_TEST_OUTPUT_DIR="$RUNNER_TEMP/nexpdf-test-output" ctest --test-dir build/release --output-on-failure
+          cmake --install build/release --prefix "$PWD/stage"
+          "$QT_ROOT_DIR/bin/macdeployqt" stage/nexPDF.app -always-overwrite
+          lipo -archs stage/nexPDF.app/Contents/MacOS/nexPDF | grep -q arm64
+          lipo -archs stage/nexPDF.app/Contents/MacOS/nexPDF | grep -q x86_64
+          stage/nexPDF.app/Contents/MacOS/nexPDF --version
+      - name: Independently validate generated PDFs
+        run: |
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/edited.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
+          encryption="$(qpdf '--password=用户-123' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf")"
+          grep -q 'file encryption method: AESv3' <<<"$encryption"
+          aes128="$(qpdf '--password=' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes128-empty-user.pdf")"
+          grep -q 'file encryption method: AESv2' <<<"$aes128"
+          grep -q 'extract for any purpose: not allowed' <<<"$aes128"
+          grep -q 'print high resolution: not allowed' <<<"$aes128"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/edited.pdf" "$RUNNER_TEMP/edited"
+          test -s "$RUNNER_TEMP/edited.png"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf" "$RUNNER_TEMP/redacted"
+          test -s "$RUNNER_TEMP/redacted.png"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/watermark-original.pdf" "$RUNNER_TEMP/original"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf" "$RUNNER_TEMP/marked"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf" "$RUNNER_TEMP/restored"
+          ! cmp -s "$RUNNER_TEMP/original.png" "$RUNNER_TEMP/marked.png"
+          cmp "$RUNNER_TEMP/original.png" "$RUNNER_TEMP/restored.png"
+      - name: Package unsigned DMG
+        run: |
+          mkdir -p dist
+          hdiutil create -volname nexPDF -srcfolder stage/nexPDF.app -ov -format UDZO \
+            "dist/nexPDF-$RELEASE_TAG-macos-universal-unsigned.dmg"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-assets
+          path: dist/*
+          if-no-files-found: error
+
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          submodules: recursive
+      - name: Verify nested source and create archive
+        run: |
+          test "$(git -C third_party/mupdf rev-parse HEAD)" = "fe374accd98a43174a328fa7980d7675e06d5b0d"
+          git -C third_party/mupdf submodule foreach --recursive 'test -n "$(git rev-parse HEAD)"'
+          mkdir -p dist "nexPDF-$RELEASE_TAG"
+          tar --exclude=.git --exclude=build --exclude=out --exclude=dist --exclude=.tools \
+            -cf - . | tar -xf - -C "nexPDF-$RELEASE_TAG"
+          tar -czf "dist/nexPDF-$RELEASE_TAG-source-full.tar.gz" "nexPDF-$RELEASE_TAG"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: source-assets
+          path: dist/*
+          archive: false
+
+  publish:
+    needs: [windows, linux, macos, source]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          submodules: recursive
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Extract executable AppImage asset
+        run: |
+          tar -xzf "dist/nexPDF-$RELEASE_TAG-linux-asset.tar.gz" -C dist
+          rm "dist/nexPDF-$RELEASE_TAG-linux-asset.tar.gz"
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0.24.0
+        with:
+          path: .
+          format: spdx-json
+          output-file: dist/nexPDF-${{ env.RELEASE_TAG }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Generate checksums and validate notes
+        run: |
+          test -f "docs/release-notes/$RELEASE_TAG.md"
+          python tools/check_release_assets.py dist \
+            --json dist/PACKAGE_SIZES.json --markdown dist/PACKAGE_SIZES.md
+          cd dist
+          sha256sum * > SHA256SUMS
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: nexPDF ${{ env.RELEASE_TAG }}
+          body_path: docs/release-notes/${{ env.RELEASE_TAG }}.md
+          prerelease: ${{ contains(env.RELEASE_TAG, 'alpha') || contains(env.RELEASE_TAG, 'beta') || contains(env.RELEASE_TAG, 'rc') }}
+          files: dist/*
+          fail_on_unmatched_files: true

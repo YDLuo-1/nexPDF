@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="nexPDF">
+  <rect x="36" y="20" width="184" height="216" rx="22" fill="#f7f7f4"/>
+  <path d="M164 20v55h56" fill="#d9ddd8"/>
+  <path d="M164 20l56 55h-56z" fill="#e9ebe7"/>
+  <path d="M72 178V91h25l41 53V91h26v87h-24l-42-54v54z" fill="#252936"/>
+  <path d="M68 198h120" stroke="#e64545" stroke-width="12" stroke-linecap="round"/>
+</svg>

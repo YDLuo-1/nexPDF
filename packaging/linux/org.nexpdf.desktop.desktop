@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=nexPDF
+Comment=Local PDF viewer and practical editor
+Comment[zh_CN]=本地 PDF 查看与实用编辑工具
+Exec=nexPDF %F
+Icon=org.nexpdf.desktop
+Terminal=false
+Categories=Office;Viewer;
+MimeType=application/pdf;

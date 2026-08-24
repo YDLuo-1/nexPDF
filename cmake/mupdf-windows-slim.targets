@@ -1,0 +1,15 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PreprocessorDefinitions>FZ_ENABLE_OCR_OUTPUT=0;FZ_ENABLE_DOCX_OUTPUT=0;FZ_ENABLE_ODT_OUTPUT=0;FZ_ENABLE_BARCODE=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <UndefinePreprocessorDefinitions>HAVE_TESSERACT;HAVE_LEPTONICA;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Remove="..\..\source\fitz\barcode.c" />
+    <ClCompile Remove="..\..\source\fitz\output-docx.c" />
+    <ProjectReference Remove="libtesseract.vcxproj" />
+    <ProjectReference Remove="libextract.vcxproj" />
+    <ProjectReference Remove="libmubarcode.vcxproj" />
+  </ItemGroup>
+</Project>

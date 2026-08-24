@@ -1,0 +1,193 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+            qt_arch: win64_msvc2022_64
+          - name: Linux x86_64
+            os: ubuntu-24.04
+            qt_arch: linux_gcc_64
+          - name: macOS Universal
+            os: macos-15
+            qt_arch: clang_64
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install Qt 6.11.2
+        uses: jurplel/install-qt-action@v4.3.1
+        with:
+          version: 6.11.2
+          arch: ${{ matrix.qt_arch }}
+          archives: qtbase
+          cache: true
+
+      - name: Install Windows validators
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install qpdf poppler --yes --no-progress
+
+      - name: Install Linux validators
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build qpdf poppler-utils
+
+      - name: Install macOS validators
+        if: runner.os == 'macOS'
+        run: brew install ninja qpdf poppler
+
+      - name: Build slim MuPDF on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: tools/Build-MuPDFWindows.ps1 -Configuration Release
+
+      - name: Build slim MuPDF on Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          NEXPDF_BUILD_JOBS: "3"
+          NEXPDF_MACOS_UNIVERSAL: ${{ runner.os == 'macOS' && '1' || '0' }}
+        run: bash tools/build_mupdf_unix.sh "$RUNNER_TEMP/mupdf-prefix"
+
+      - name: Configure Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          cmake -S . -B build/ci -G "Visual Studio 17 2022" -A x64
+          -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          -DMUPDF_ROOT="$pwd/out/mupdf-windows-x64"
+          -DNEXPDF_BUILD_BENCHMARKS=ON
+
+      - name: Configure Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          NEXPDF_OSX_ARCHS: ${{ runner.os == 'macOS' && 'arm64;x86_64' || '' }}
+        run: >-
+          cmake -S . -B build/ci -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+          -DMUPDF_ROOT="$RUNNER_TEMP/mupdf-prefix"
+          -DNEXPDF_BUILD_BENCHMARKS=ON
+          -DCMAKE_OSX_ARCHITECTURES="$NEXPDF_OSX_ARCHS"
+
+      - name: Build
+        run: cmake --build build/ci --config Release --parallel 3
+
+      - name: Test Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:NEXPDF_TEST_OUTPUT_DIR = "$env:RUNNER_TEMP/nexpdf-test-output"
+          ctest --test-dir build/ci -C Release --output-on-failure
+
+      - name: Test Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: NEXPDF_TEST_OUTPUT_DIR="$RUNNER_TEMP/nexpdf-test-output" ctest --test-dir build/ci --output-on-failure
+
+      - name: Independent validation Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/edited.pdf"
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf"
+          qpdf --check "$env:RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
+          $encryption = qpdf '--password=用户-123' --show-encryption "$env:RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf"
+          if ($LASTEXITCODE -ne 0 -or -not ($encryption -match 'file encryption method: AESv3')) { throw "AES-256 independent validation failed" }
+          $aes128 = qpdf '--password=' --show-encryption "$env:RUNNER_TEMP/nexpdf-test-output/aes128-empty-user.pdf"
+          if ($LASTEXITCODE -ne 0 -or -not ($aes128 -match 'file encryption method: AESv2') -or -not ($aes128 -match 'extract for any purpose: not allowed') -or -not ($aes128 -match 'print high resolution: not allowed')) { throw "AES-128 permissions validation failed" }
+          pdftoppm -png -f 1 -singlefile "$env:RUNNER_TEMP/nexpdf-test-output/edited.pdf" "$env:RUNNER_TEMP/edited"
+          if (-not (Test-Path "$env:RUNNER_TEMP/edited.png")) { throw "Poppler did not render the edited PDF" }
+          pdftoppm -png -f 1 -singlefile "$env:RUNNER_TEMP/nexpdf-test-output/redacted.pdf" "$env:RUNNER_TEMP/redacted"
+          if (-not (Test-Path "$env:RUNNER_TEMP/redacted.png")) { throw "Poppler did not render the redacted PDF" }
+          pdftoppm -png -f 1 -singlefile "$env:RUNNER_TEMP/nexpdf-test-output/watermark-original.pdf" "$env:RUNNER_TEMP/original"
+          pdftoppm -png -f 1 -singlefile "$env:RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf" "$env:RUNNER_TEMP/marked"
+          pdftoppm -png -f 1 -singlefile "$env:RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf" "$env:RUNNER_TEMP/restored"
+          if ((Get-FileHash "$env:RUNNER_TEMP/original.png").Hash -eq (Get-FileHash "$env:RUNNER_TEMP/marked.png").Hash) { throw "Watermark was not rendered by Poppler" }
+          if ((Get-FileHash "$env:RUNNER_TEMP/original.png").Hash -ne (Get-FileHash "$env:RUNNER_TEMP/restored.png").Hash) { throw "Poppler render mismatch" }
+
+      - name: Independent validation Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/edited.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf"
+          qpdf --check "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf"
+          encryption="$(qpdf '--password=用户-123' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes256-unicode.pdf")"
+          grep -q 'file encryption method: AESv3' <<<"$encryption"
+          aes128="$(qpdf '--password=' --show-encryption "$RUNNER_TEMP/nexpdf-test-output/aes128-empty-user.pdf")"
+          grep -q 'file encryption method: AESv2' <<<"$aes128"
+          grep -q 'extract for any purpose: not allowed' <<<"$aes128"
+          grep -q 'print high resolution: not allowed' <<<"$aes128"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/edited.pdf" "$RUNNER_TEMP/edited"
+          test -s "$RUNNER_TEMP/edited.png"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf" "$RUNNER_TEMP/redacted"
+          test -s "$RUNNER_TEMP/redacted.png"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/watermark-original.pdf" "$RUNNER_TEMP/original"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/watermark-marked.pdf" "$RUNNER_TEMP/marked"
+          pdftoppm -png -f 1 -singlefile "$RUNNER_TEMP/nexpdf-test-output/watermark-restored.pdf" "$RUNNER_TEMP/restored"
+          ! cmp -s "$RUNNER_TEMP/original.png" "$RUNNER_TEMP/marked.png"
+          cmp "$RUNNER_TEMP/original.png" "$RUNNER_TEMP/restored.png"
+
+      - name: Version smoke Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $stage = "$env:RUNNER_TEMP/nexpdf-stage"
+          cmake --install build/ci --config Release --prefix "$stage"
+          & "$env:QT_ROOT_DIR/bin/windeployqt.exe" --release --no-system-d3d-compiler --no-system-dxc-compiler `
+            --skip-plugin-types generic,networkinformation,tls "$stage/bin/nexPDF.exe"
+          @("Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll", "platforms/qwindows.dll") | ForEach-Object {
+            if (-not (Test-Path "$stage/bin/$_")) { throw "Missing deployed runtime: $_" }
+          }
+          $process = Start-Process -FilePath "$stage/bin/nexPDF.exe" -ArgumentList '--version' -PassThru -WindowStyle Hidden
+          if (-not $process.WaitForExit(10000)) { $process.Kill(); throw "nexPDF --version timed out" }
+          if ($process.ExitCode -ne 0) { throw "nexPDF --version exited with $($process.ExitCode)" }
+
+      - name: Version smoke Linux
+        if: runner.os == 'Linux'
+        run: QT_QPA_PLATFORM=offscreen build/ci/app/nexPDF --version
+
+      - name: Version smoke macOS
+        if: runner.os == 'macOS'
+        run: build/ci/app/nexPDF.app/Contents/MacOS/nexPDF --version
+
+      - name: Upload independent-validation outputs
+        uses: actions/upload-artifact@v7
+        with:
+          name: validation-${{ runner.os }}
+          path: ${{ runner.temp }}/nexpdf-test-output
+          if-no-files-found: error
