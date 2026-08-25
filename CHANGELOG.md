@@ -4,6 +4,11 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0-rc.5] - 2026-08-25
+
+- Simplify Release attachments to the five user-facing packages; keep package-size analysis in the repository and use GitHub asset digests instead of standalone reports.
+- Remove reproducible local build, validation, audit, and distribution directories; strengthen `.gitignore` for generated CMake and native binaries.
+
 ## [1.0.0-rc.4] - 2026-08-24
 
 - Require and publish a measured composition analysis when a binary package exceeds the 80 MiB target; RC.3 produced no incomplete GitHub Release.

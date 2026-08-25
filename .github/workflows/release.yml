@@ -326,22 +326,10 @@ jobs:
         run: |
           tar -xzf "dist/nexPDF-$RELEASE_TAG-linux-asset.tar.gz" -C dist
           rm "dist/nexPDF-$RELEASE_TAG-linux-asset.tar.gz"
-      - name: Generate SPDX SBOM
-        uses: anchore/sbom-action@v0.24.0
-        with:
-          path: .
-          format: spdx-json
-          output-file: dist/nexPDF-${{ env.RELEASE_TAG }}.spdx.json
-          upload-artifact: false
-          upload-release-assets: false
       - name: Generate checksums and validate notes
         run: |
           test -f "docs/release-notes/$RELEASE_TAG.md"
-          python tools/check_release_assets.py dist \
-            --json dist/PACKAGE_SIZES.json --markdown dist/PACKAGE_SIZES.md \
-            --over-limit-analysis docs/package-size-analysis.md
-          cd dist
-          sha256sum * > SHA256SUMS
+          python tools/check_release_assets.py dist --over-limit-analysis docs/package-size-analysis.md
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -349,5 +337,10 @@ jobs:
           name: nexPDF ${{ env.RELEASE_TAG }}
           body_path: docs/release-notes/${{ env.RELEASE_TAG }}.md
           prerelease: ${{ contains(env.RELEASE_TAG, 'alpha') || contains(env.RELEASE_TAG, 'beta') || contains(env.RELEASE_TAG, 'rc') }}
-          files: dist/*
+          files: |
+            dist/nexPDF-${{ env.RELEASE_TAG }}-windows-x64-portable.zip
+            dist/nexPDF-${{ env.RELEASE_TAG }}-windows-x64-setup.exe
+            dist/nexPDF-${{ env.RELEASE_TAG }}-linux-x86_64.AppImage
+            dist/nexPDF-${{ env.RELEASE_TAG }}-macos-universal-unsigned.dmg
+            dist/nexPDF-${{ env.RELEASE_TAG }}-source-full.tar.gz
           fail_on_unmatched_files: true

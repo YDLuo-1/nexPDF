@@ -60,6 +60,6 @@ MuPDF reopen validation is mandatory but not independent, so it cannot replace q
 - Windows x64: portable ZIP and unsigned `setup.exe`
 - Linux x86_64: AppImage
 - macOS: unsigned Universal DMG
-- every release: `SHA256SUMS`, SPDX SBOM, bilingual notes, and corresponding source including MuPDF submodules
+- every release: bilingual notes and corresponding source including MuPDF submodules; GitHub displays SHA-256 digests for uploaded assets
 
 Unsigned packages must warn about SmartScreen/Gatekeeper. A source archive that omits nested MuPDF dependency contents does not satisfy the project release checklist.

@@ -10,7 +10,7 @@ A tag is not a formal release until every required item is checked with attached
 - [ ] CJK, RTL, embedded fonts, transparency, layers, object streams, damaged xref, large images, and 100/300/1000-page corpus pass.
 - [ ] Measured P50/P95, throughput, peak RSS, error count, 50-cycle memory stability, mutool ratios, and package-size report are published.
 - [ ] High-DPI, Chinese IME, theme, scrollbar, focus/accessibility, and three-platform screenshots are reviewed.
-- [ ] Portable ZIP, unsigned setup.exe, AppImage, Universal DMG, full source, SPDX SBOM, SHA256SUMS, and bilingual notes exist.
+- [ ] Portable ZIP, unsigned setup.exe, AppImage, Universal DMG, full source, and bilingual notes exist; GitHub asset digests are visible for integrity checks.
 - [ ] Source archive contains MuPDF and all nested dependency source required by AGPL corresponding-source obligations.
 - [ ] A clean VM runs `--version`, open, render, edit, save, reopen; unsigned-package warnings are visible in notes.
 

@@ -15,7 +15,7 @@ The Windows runtime also contains Qt platform/style/image-format plugins (`qwind
 
 ## MuPDF transitive components / MuPDF 传递组件
 
-The slim build initializes and compiles the MuPDF-pinned revisions of `jbig2dec`, `mujs`, `freetype`, `gumbo-parser`, `harfbuzz`, `libjpeg`, `lcms2`, `openjpeg`, `zlib`, `brotli`, and `cmark-gfm`. They provide PDF image codecs, fonts, shaping, color management, compression, HTML parsing, and scripting support required by MuPDF internals. Their original license files remain in the complete MuPDF source tree and must be carried into the corresponding-source/SBOM process. / 精简构建初始化并编译 MuPDF 锁定版本的上述组件，用于 PDF 图像编解码、字体、文字塑形、色彩管理、压缩、HTML 解析及 MuPDF 内部脚本支持。其原始许可文件保留在完整 MuPDF 源码树中，必须纳入对应源码与 SBOM 流程。
+The slim build initializes and compiles the MuPDF-pinned revisions of `jbig2dec`, `mujs`, `freetype`, `gumbo-parser`, `harfbuzz`, `libjpeg`, `lcms2`, `openjpeg`, `zlib`, `brotli`, and `cmark-gfm`. They provide PDF image codecs, fonts, shaping, color management, compression, HTML parsing, and scripting support required by MuPDF internals. Their original license files remain in the complete MuPDF source tree and must be carried into the corresponding-source license process. / 精简构建初始化并编译 MuPDF 锁定版本的上述组件，用于 PDF 图像编解码、字体、文字塑形、色彩管理、压缩、HTML 解析及 MuPDF 内部脚本支持。其原始许可文件保留在完整 MuPDF 源码树中，必须纳入对应源码许可流程。
 
 OCR/Tesseract, curl/network loading, GLUT viewer, Office extraction, ZXing, and Zint are excluded from the nexPDF production build. / nexPDF 生产构建排除了 OCR/Tesseract、curl 网络加载、GLUT 查看器、Office 提取、ZXing 和 Zint。
 
@@ -23,7 +23,7 @@ OCR/Tesseract, curl/network loading, GLUT viewer, Office extraction, ZXing, and 
 
 - Qt Test is linked only by test/benchmark executables and is excluded from end-user packages. / Qt Test 仅由测试和基准程序链接，不进入最终用户包。
 - qpdf and Poppler are independent CI/developer validators. They are not linked into `nexPDF.exe`. / qpdf 与 Poppler 是 CI/开发独立校验器，不链接进 `nexPDF.exe`。
-- CMake, MSBuild/Ninja, NSIS, GitHub Actions, and the SPDX SBOM action are build/release tools, not runtime libraries. / 这些是构建和发布工具，不是运行库。
+- CMake, MSBuild/Ninja, NSIS, and GitHub Actions are build/release tools, not runtime libraries. / 这些是构建和发布工具，不是运行库。
 
 ## Compliance boundary / 合规边界
 
@@ -31,7 +31,7 @@ OCR/Tesseract, curl/network loading, GLUT viewer, Office extraction, ZXing, and 
 - A modified network service must offer its interacting users the corresponding source required by AGPL section 13. / 修改版网络服务必须按 AGPL 第 13 条向交互用户提供对应源码。
 - A closed-source, source-available-but-not-AGPL, or otherwise AGPL-incompatible product must not use this MuPDF build without obtaining suitable commercial terms from Artifex. / 闭源、仅源码可见但非 AGPL、或其他不兼容产品，不得继续使用此 MuPDF 构建，除非从 Artifex 获得合适的商业许可。
 - Qt is dynamically linked. Releases must retain notices and LGPL text, provide the applicable Qt corresponding source or a compliant offer, and must not prohibit the user's LGPL relinking/debugging rights. / Qt 采用动态链接；发布物必须保留声明和 LGPL 文本，提供适用 Qt 对应源码或合规获取方式，且不得禁止用户为 LGPL 重链接而进行的调试权利。
-- The Release workflow generates an SPDX SBOM and a full source archive, but those assets are not considered verified until the three-platform Release workflow succeeds and the archive is inspected. / Release 工作流会生成 SPDX SBOM 和完整源码包，但在三平台工作流成功且归档内容经检查前，不视为已完成验证。
+- The Release workflow publishes only the five user-facing packages: Windows portable ZIP, Windows setup EXE, Linux AppImage, macOS Universal DMG, and the full corresponding-source archive. GitHub displays each asset's SHA-256 digest; package-size analysis remains in the repository and CI. / Release 工作流只发布五个面向用户的包：Windows 便携 ZIP、Windows 安装 EXE、Linux AppImage、macOS Universal DMG 和完整对应源码包。GitHub 会显示每个附件的 SHA-256 摘要；包体分析保留在仓库和 CI 中。
 
 Official references / 官方参考：
 
