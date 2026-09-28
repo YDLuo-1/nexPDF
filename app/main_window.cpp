@@ -281,6 +281,7 @@ void MainWindow::changeEvent(QEvent *event)
 void MainWindow::resetThumbnails()
 {
     thumbnailRequests_.clear();
+    thumbnailDensities_.clear();
     pendingThumbnailPages_.clear();
     thumbnailList_->clear();
     for (int page = 0; page < pageCount_; ++page) {
@@ -303,14 +304,16 @@ void MainWindow::requestVisibleThumbnails()
     for (int page = first; page <= last; ++page) {
         QListWidgetItem *item = thumbnailList_->item(page);
         if (item == nullptr || !item->icon().isNull() || pendingThumbnailPages_.contains(page)) continue;
+        const qreal density = std::max(1.0, thumbnailList_->devicePixelRatioF());
         const quint64 requestId = nextThumbnailRequestId_++;
         thumbnailRequests_.insert(requestId, page);
+        thumbnailDensities_.insert(requestId, density);
         pendingThumbnailPages_.insert(page);
         nexpdf::RenderRequest request;
         request.requestId = requestId;
         request.revision = revision_;
         request.pageIndex = page;
-        request.scale = 0.14;
+        request.scale = 0.14 * density;
         request.priority = -5;
         session_.requestRender(request);
     }
@@ -322,10 +325,17 @@ void MainWindow::acceptThumbnailRender(const nexpdf::RenderResult &result)
     if (found == thumbnailRequests_.end()) return;
     const int page = found.value();
     thumbnailRequests_.erase(found);
+    qreal density = 1.0;
+    if (const auto recorded = thumbnailDensities_.constFind(result.requestId); recorded != thumbnailDensities_.constEnd()) {
+        density = recorded.value();
+        thumbnailDensities_.remove(result.requestId);
+    }
     pendingThumbnailPages_.remove(page);
     if (result.revision != revision_ || result.image.isNull()) return;
     if (QListWidgetItem *item = thumbnailList_->item(page)) {
-        item->setIcon(QIcon(QPixmap::fromImage(result.image).scaled(
+        QImage image = result.image;
+        image.setDevicePixelRatio(density);
+        item->setIcon(QIcon(QPixmap::fromImage(std::move(image)).scaled(
             thumbnailList_->iconSize(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     }
 }

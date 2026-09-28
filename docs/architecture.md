@@ -4,7 +4,7 @@
 
 1. `DocumentSession` is the only public document façade. There is no speculative engine interface or plugin ABI in v1. / `DocumentSession` 是唯一文档门面，v1 不建立预留的引擎接口或插件 ABI。
 2. A document is opened, parsed, searched, modified, journaled, and saved only on its document thread. UI code never calls MuPDF directly. / 打开、解析、搜索、修改、journal 和保存仅发生在文档线程，UI 不直接调用 MuPDF。
-3. Cache identity contains document revision, page, scale bucket, rotation, and tile coordinates. Editing increments the revision, making stale render results unusable. / 缓存键包含 revision、页码、缩放档、旋转和瓦片坐标；编辑递增 revision，旧渲染结果自动失效。
+3. Cache identity contains document revision, page, scale bucket, rotation, render density (device pixel ratio), and tile coordinates. Editing increments the revision, making stale render results unusable. / 缓存键包含 revision、页码、缩放档、旋转、渲染密度（设备像素比）和瓦片坐标；编辑递增 revision，旧渲染结果自动失效。
 4. The default byte-budgeted cache total is 256 MiB: a 64 MiB MuPDF store plus a 192 MiB tile LRU, configurable to a 64–1024 MiB total. Display lists are separately capped to the eight most recently used pages because MuPDF does not expose their byte cost. / 默认按字节计费的缓存总额为 256 MiB：64 MiB MuPDF store 加 192 MiB 瓦片 LRU，总额可设置为 64–1024 MiB。MuPDF 不提供 display list 字节成本，因此另按最近使用的 8 页设硬上限。
 5. Passwords never enter log messages, progress text, exceptions, recent-file metadata, or crash annotations. Temporary UTF-8 buffers, MuPDF write buffers, and the document-session password cache are overwritten when released. / 密码不得进入日志、进度文本、异常、最近文件元数据或崩溃注释；临时 UTF-8 缓冲区、MuPDF 写入缓冲区和文档会话密码缓存在释放时覆盖清理。
 6. Existing signed PDFs are never overwritten after modification. / 修改后的已签名 PDF 永不覆盖原文件。

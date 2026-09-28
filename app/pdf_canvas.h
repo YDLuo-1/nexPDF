@@ -49,12 +49,15 @@ private:
     void requestVisiblePages(const QRect &visible);
     QString cacheKey(int pageIndex, const QPoint &tileOrigin) const;
     std::optional<int> pageAt(const QPoint &position) const;
+    [[nodiscard]] qreal renderDensity() const;
+    [[nodiscard]] int tileEdge() const;
 
     nexpdf::DocumentSession *session_;
     QVector<PageLayout> pages_;
     QCache<QString, QImage> cache_;
     QSet<QString> pending_;
     QHash<quint64, QString> requestKeys_;
+    QHash<quint64, qreal> requestDensities_;
     int pageCount_ = 0;
     int currentPage_ = 0;
     int rotation_ = 0;

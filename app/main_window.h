@@ -134,6 +134,7 @@ private:
     quint64 revision_ = 0;
     quint64 nextThumbnailRequestId_ = (quint64{1} << 63);
     QHash<quint64, int> thumbnailRequests_;
+    QHash<quint64, qreal> thumbnailDensities_;
     QSet<int> pendingThumbnailPages_;
     QRectF pendingObjectBounds_;
     int pendingObjectPage_ = -1;

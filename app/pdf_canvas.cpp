@@ -14,6 +14,7 @@
 namespace {
 constexpr int kPageGap = 24;
 constexpr int kTileEdge = 512;
+constexpr int kMaximumTileEdge = 1024;  // DocumentSession rejects rendered tile edges above this.
 constexpr int kMuPdfStoreMiB = 64;
 constexpr int kDefaultTotalCacheMiB = 256;
 constexpr QSize kDefaultPagePoints(595, 842);
@@ -38,6 +39,7 @@ void PdfCanvas::setDocument(const nexpdf::DocumentInfo &info)
     cache_.clear();
     pending_.clear();
     requestKeys_.clear();
+    requestDensities_.clear();
     selectionRect_ = {};
     rebuildLayout();
 }
@@ -49,6 +51,7 @@ void PdfCanvas::clearDocument()
     cache_.clear();
     pending_.clear();
     requestKeys_.clear();
+    requestDensities_.clear();
     selectionRect_ = {};
     resize(1, 1);
     update();
@@ -65,6 +68,7 @@ void PdfCanvas::setZoom(const qreal zoom)
     cache_.clear();
     pending_.clear();
     requestKeys_.clear();
+    requestDensities_.clear();
     rebuildLayout();
 }
 
@@ -79,6 +83,7 @@ void PdfCanvas::setRotation(const int rotation)
     cache_.clear();
     pending_.clear();
     requestKeys_.clear();
+    requestDensities_.clear();
     rebuildLayout();
 }
 
@@ -109,6 +114,7 @@ void PdfCanvas::paintEvent(QPaintEvent *event)
     }
 
     const QRect visible = visibleRegion().boundingRect().adjusted(0, -height(), 0, height());
+    const int edge = tileEdge();
     for (int index = 0; index < pages_.size(); ++index) {
         const QRect pageRect = pages_[index].rect;
         if (!pageRect.intersects(visible)) {
@@ -117,10 +123,10 @@ void PdfCanvas::paintEvent(QPaintEvent *event)
         painter.fillRect(pageRect, Qt::white);
         bool drewTile = false;
         const QRect localVisible = event->rect().intersected(pageRect).translated(-pageRect.topLeft());
-        const int firstX = std::max(0, localVisible.left() / kTileEdge * kTileEdge);
-        const int firstY = std::max(0, localVisible.top() / kTileEdge * kTileEdge);
-        for (int y = firstY; y <= localVisible.bottom(); y += kTileEdge) {
-            for (int x = firstX; x <= localVisible.right(); x += kTileEdge) {
+        const int firstX = std::max(0, localVisible.left() / edge * edge);
+        const int firstY = std::max(0, localVisible.top() / edge * edge);
+        for (int y = firstY; y <= localVisible.bottom(); y += edge) {
+            for (int x = firstX; x <= localVisible.right(); x += edge) {
                 if (const QImage *image = cache_.object(cacheKey(index, QPoint(x, y)))) {
                     painter.drawImage(pageRect.topLeft() + QPoint(x, y), *image);
                     drewTile = true;
@@ -201,6 +207,11 @@ void PdfCanvas::acceptRender(const nexpdf::RenderResult &result)
     }
     const QString key = request.value();
     requestKeys_.erase(request);
+    qreal density = 1.0;
+    if (const auto recorded = requestDensities_.constFind(result.requestId); recorded != requestDensities_.constEnd()) {
+        density = recorded.value();
+        requestDensities_.remove(result.requestId);
+    }
     pending_.remove(key);
     if (result.revision != revision_ || result.pageIndex < 0 || result.pageIndex >= pages_.size()) {
         return;
@@ -209,11 +220,13 @@ void PdfCanvas::acceptRender(const nexpdf::RenderResult &result)
         return;
     }
     auto *image = new QImage(result.image);
+    image->setDevicePixelRatio(density);
     cache_.insert(key, image, std::max(1, static_cast<int>(image->sizeInBytes() / 1024)));
 
     const QSize oldSize = pages_[result.pageIndex].pixelSize;
-    const QSize newSize = result.pagePixelSize;
-    if (newSize.isValid() && oldSize != newSize) {
+    const QSize newSize(std::max(1, qRound(result.pagePixelSize.width() / density)),
+                        std::max(1, qRound(result.pagePixelSize.height() / density)));
+    if (oldSize != newSize) {
         pages_[result.pageIndex].pixelSize = newSize;
         rebuildLayout();
     } else {
@@ -258,10 +271,13 @@ void PdfCanvas::requestVisiblePages(const QRect &visible)
         const QRect pageVisible = pages_[index].rect
             .intersected(visible.adjusted(0, -visible.height(), 0, visible.height()))
             .translated(-pages_[index].rect.topLeft());
-        const int firstX = std::max(0, pageVisible.left() / kTileEdge * kTileEdge);
-        const int firstY = std::max(0, pageVisible.top() / kTileEdge * kTileEdge);
-        for (int y = firstY; y <= pageVisible.bottom(); y += kTileEdge) {
-            for (int x = firstX; x <= pageVisible.right(); x += kTileEdge) {
+        const int edge = tileEdge();
+        const qreal density = renderDensity();
+        const int renderedEdge = qRound(edge * density);
+        const int firstX = std::max(0, pageVisible.left() / edge * edge);
+        const int firstY = std::max(0, pageVisible.top() / edge * edge);
+        for (int y = firstY; y <= pageVisible.bottom(); y += edge) {
+            for (int x = firstX; x <= pageVisible.right(); x += edge) {
                 const QPoint origin(x, y);
                 const QString key = cacheKey(index, origin);
                 if (cache_.contains(key) || pending_.contains(key)) {
@@ -271,11 +287,13 @@ void PdfCanvas::requestVisiblePages(const QRect &visible)
                 nexpdf::RenderRequest request;
                 request.requestId = nextRequestId_++;
                 requestKeys_.insert(request.requestId, key);
+                requestDensities_.insert(request.requestId, density);
                 request.revision = revision_;
                 request.pageIndex = index;
-                request.scale = zoom_;
+                request.scale = zoom_ * density;
                 request.rotation = rotation_;
-                request.tilePixels = QRect(origin, QSize(kTileEdge, kTileEdge));
+                request.tilePixels = QRect(qRound(origin.x() * density), qRound(origin.y() * density),
+                                           renderedEdge, renderedEdge);
                 request.priority = pages_[index].rect.intersects(visible) ? 10 : 0;
                 session_->requestRender(request);
             }
@@ -289,9 +307,23 @@ void PdfCanvas::requestVisiblePages(const QRect &visible)
 
 QString PdfCanvas::cacheKey(const int pageIndex, const QPoint &tileOrigin) const
 {
-    return QStringLiteral("%1:%2:%3:%4:%5:%6")
-        .arg(revision_).arg(pageIndex).arg(qRound(zoom_ * 1000)).arg(rotation_)
-        .arg(tileOrigin.x()).arg(tileOrigin.y());
+    return QStringLiteral("%1:%2:%3:%4:%5:%6:%7")
+        .arg(revision_).arg(pageIndex).arg(qRound(zoom_ * 1000)).arg(qRound(renderDensity() * 100))
+        .arg(rotation_).arg(tileOrigin.x()).arg(tileOrigin.y());
+}
+
+qreal PdfCanvas::renderDensity() const
+{
+    return std::max(1.0, devicePixelRatioF());
+}
+
+int PdfCanvas::tileEdge() const
+{
+    const qreal density = renderDensity();
+    if (qRound(kTileEdge * density) <= kMaximumTileEdge) {
+        return kTileEdge;
+    }
+    return std::max(64, static_cast<int>(kMaximumTileEdge / density));
 }
 
 std::optional<int> PdfCanvas::pageAt(const QPoint &position) const
