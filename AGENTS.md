@@ -65,6 +65,7 @@
 4. Windows 最终资产应同时提供便携 ZIP 和安装程序 EXE。便携版不能是孤立单 EXE，因为 Qt DLL 与平台插件属于必需运行时；测试程序、benchmark 和 `Qt6Test.dll` 不得进入最终用户包。
 5. 已推送的公开版本标签不可移动、覆盖或删除后重建。标签后发现问题时保留失败历史，修复提交进入 `main` 并递增 RC 编号；不得为了让页面好看而重写 RC.1、RC.2 等公开标签。
 6. Release 只上传五类面向用户的附件：Windows 便携 ZIP、Windows 安装 EXE、Linux AppImage、macOS Universal DMG 和包含 MuPDF 对应源码的完整源码包。SBOM、包体报告和独立 `SHA256SUMS` 不进入 Release 附件；包体分析留在仓库/CI，完整性校验使用 GitHub 为每个附件显示的 SHA-256 摘要。历史 Release 不回删附件，新策略从递增的下一个 RC 生效。
+7. 功能或修复合入 `main` 后，必须在同一工作批次内递增发布对应的 RC，保证 Releases 页面始终提供包含全部已合入变更的完整可用包；不得让最新公开 Release 长期落后于 `main`，也不得发布明知缺少已合入修复的版本。
 
 ## 本地目录整理规则
 

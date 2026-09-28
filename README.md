@@ -7,6 +7,8 @@
 nexPDF 是一个本地运行、跨平台的 PDF 查看与实用编辑工具，使用 C++20、Qt Widgets 和 MuPDF 构建。它不包含遥测，不上传文档，也不会自动执行 PDF JavaScript、启动嵌入文件或静默打开外部链接。
 
 > 项目状态：`v1.0.0` 开发中。源码接口和文件格式约定在 v1 前可能变化。只有通过发布检查表的标签才会被标记为正式 Release。
+>
+> **下载使用**：前往 [Releases](https://github.com/YDLuo-1/nexPDF/releases) 获取最新候选版的 Windows 便携 ZIP / 安装包、Linux AppImage、macOS DMG 与完整源码包；每次功能或修复合入后都会立即发布包含全部变更的候选版。
 
 ### 功能
 
@@ -82,6 +84,8 @@ nexPDF 与任何其他同名或近似名称的 NexPDF 产品、公司或网站�
 nexPDF is a local, cross-platform PDF viewer and practical editor built with C++20, Qt Widgets, and MuPDF. It contains no telemetry, uploads no documents, and does not automatically execute PDF JavaScript, launch embedded files, or silently open external links.
 
 > Project status: `v1.0.0` is under development. Source interfaces and file conventions may change before v1. Only tags that pass the release checklist are published as formal releases.
+>
+> **Download**: head to [Releases](https://github.com/YDLuo-1/nexPDF/releases) for the latest release candidate with the Windows portable ZIP / installer, Linux AppImage, macOS DMG, and the full source archive; every merged feature or fix is followed immediately by a candidate containing all changes.
 
 ### Features
 

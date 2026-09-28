@@ -4,6 +4,12 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0-rc.7] - 2026-09-28
+
+### Fixed / 修复
+
+- Render the main canvas and thumbnails at the device pixel ratio so pages stay sharp on high-DPI displays; cache identity includes the render density. / 主画布与缩略图按设备像素比渲染，修复高 DPI 屏幕上的页面模糊；缓存键纳入渲染密度。
+
 ### Added / 新增
 
 - Remember each document's last reading position by content fingerprint (no file paths stored) and add an eye-care page tint in the View menu. / 按内容指纹记住每个文档的阅读位置（不保存文件路径），并在视图菜单新增护眼模式页面染色。
