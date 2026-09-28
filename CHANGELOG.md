@@ -4,6 +4,11 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+### Added / 新增
+
+- Remember each document's last reading position by content fingerprint (no file paths stored) and add an eye-care page tint in the View menu. / 按内容指纹记住每个文档的阅读位置（不保存文件路径），并在视图菜单新增护眼模式页面染色。
+- The Windows installer registers nexPDF as a per-user "Open with" candidate and Default-apps entry without taking over the system `.pdf` default. / Windows 安装器把 nexPDF 注册为按用户“打开方式”候选和系统默认应用设置入口，不抢占系统 `.pdf` 默认关联。
+
 ## [1.0.0-rc.6] - 2026-09-28
 
 ### Changed / 变更

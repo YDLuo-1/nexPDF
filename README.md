@@ -10,7 +10,7 @@ nexPDF 是一个本地运行、跨平台的 PDF 查看与实用编辑工具，�
 
 ### 功能
 
-- 查看：拖放和命令行打开、密码输入、连续滚动、页码导航、缩放、旋转和文本搜索。
+- 查看：拖放和命令行打开、密码输入、连续滚动、页码导航、缩放、旋转和文本搜索；按内容指纹记住每个文档的阅读位置（不保存文件路径），并提供护眼模式页面染色。
 - 加密：AES-256（默认）和 AES-128 兼容模式；加密输出要求非空用户/所有者密码，并可配置 PDF 权限。
 - 解密：仅使用正确密码创建无加密副本；不包含破解、爆破或权限绕过功能。
 - 编辑：空白页、删除、排序、旋转、导入页面；添加、移动、缩放、删除工具创建的文字和图片；高亮、下划线、删除线、自由文本、图形、手绘批注。
@@ -21,6 +21,17 @@ nexPDF 是一个本地运行、跨平台的 PDF 查看与实用编辑工具，�
 - 界面：采用混合命令栏——打开、保存、加解密及高理解成本编辑显示图标与短文字，常见导航/批注保持紧凑图标；所有动作提供中英文 Tooltip，应用图标覆盖 Windows、Linux 和 macOS 包。
 
 PDF 权限主要依赖阅读器遵守，不能替代真正的数据访问控制。用户密码与所有者密码可以相同，但部分阅读器会优先识别为用户密码，导致所有者权限行为不可靠，因此界面会提示风险。请使用较长、唯一且非空的密码。外部 PDF 可能把水印烘焙进正文、图片或共享 XObject；nexPDF 不保证识别所有此类水印，也不会自动删除启发式候选。请仅处理您拥有权利或已获得授权的文件，并始终保留备份。
+
+### 设计取舍
+
+nexPDF 的功能取舍围绕“本地、可信、可撤销”：
+
+- **涂黑必须两阶段**：先创建预览批注，人工确认后才真正移除底层内容；只画黑框不是涂黑。
+- **水印必须可精确恢复**：添加水印前保留页面原始对象，移除最后一个水印时按原样还原，而不是再叠一层遮盖。
+- **保存必须是事务**：写入临时文件、用 MuPDF 重新打开校验、再原子替换目标；已签名文档强制另存为新文件。
+- **隐私优先于便利**：无遥测、不上传文档、不执行 PDF JavaScript；阅读位置记忆只保存内容指纹和页码，不保存文件路径。
+- **界面按理解成本分层**：高频动作保持纯图标，加密、涂黑、永久应用等高代价动作必须带文字与确认。
+- **发布必须有门槛**：三平台 CI、qpdf/Poppler 独立校验和包体积目标全部通过才允许发布；人工验收未完成前只发布 RC 预发行版。
 
 ### 界面
 
@@ -74,7 +85,7 @@ nexPDF is a local, cross-platform PDF viewer and practical editor built with C++
 
 ### Features
 
-- Viewing: drag-and-drop and command-line opening, password prompt, continuous scrolling, page navigation, zoom, rotation, and text search.
+- Viewing: drag-and-drop and command-line opening, password prompt, continuous scrolling, page navigation, zoom, rotation, and text search; remembers each document's last reading position by content fingerprint (no file paths stored) and offers an eye-care page tint.
 - Encryption: AES-256 by default, with AES-128 compatibility mode; encrypted output requires non-empty user/owner passwords and supports PDF permission flags.
 - Decryption: creates an unencrypted copy only with a correct password; no cracking, brute force, or permission bypass.
 - Editing: insert blank pages, delete, reorder, rotate, and import pages; add, move, resize, and remove tool-created text/images; highlights, underlines, strikeouts, free text, shapes, and ink annotations.
@@ -85,6 +96,17 @@ nexPDF is a local, cross-platform PDF viewer and practical editor built with C++
 - Interface: a hybrid command bar gives Open/Save, encryption, and higher-comprehension-cost edits an icon plus a short label, while familiar navigation/annotation commands stay compact; every action has bilingual tooltips and app icons are wired into Windows, Linux, and macOS packages.
 
 PDF permissions depend mainly on reader cooperation and are not a substitute for access control. User and owner passwords may match, but some readers try the user credential first and may not grant owner privileges, so the UI warns before continuing. Use long, unique, non-empty passwords. External PDFs may bake watermarks into page content, images, or shared XObjects. nexPDF cannot promise to detect all such marks and never auto-deletes heuristic candidates. Process only files you own or are authorized to modify, and always keep backups.
+
+### Design decisions
+
+nexPDF trades features around being local, trustworthy, and reversible:
+
+- **Redaction is always two-stage**: content is only removed after you create preview annotations and explicitly confirm; drawing a black box is not redaction.
+- **Watermarks must restore exactly**: original page objects are retained before the first watermark is added, and removing the last watermark restores them verbatim instead of stacking another cover layer.
+- **Saving is a transaction**: write a temporary file, reopen and validate it with MuPDF, then atomically replace the target; signed documents must be saved to a new path.
+- **Privacy over convenience**: no telemetry, no document upload, no PDF JavaScript; reading-position memory stores only a content fingerprint and page numbers, never file paths.
+- **The interface is layered by comprehension cost**: frequent actions stay icon-only, while high-stakes actions such as encryption, redaction, and permanent application always carry labels and confirmations.
+- **Releases must pass gates**: a release goes out only after three-platform CI, independent qpdf/Poppler validation, and the package-size target all pass; RC prereleases ship until human acceptance completes.
 
 ### Interface
 
