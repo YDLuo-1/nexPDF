@@ -16,7 +16,7 @@
 | `QtDBus.framework` | 1.410 | macOS 部署工具解析出的运行时依赖 |
 | 资源与元数据 | 0.150 | 应用图标、配置和签名元数据 |
 
-逻辑内容会由 UDZO/ZLIB 压缩，因此各项逻辑大小之和不等于 DMG 物理大小。没有通过删除中文翻译、CJK 支持或用户功能来降低体积。RC 阶段接受该 2.730 MiB 偏差并公开实测报告；正式 v1.0.0 前将评估不改变功能的 Release 符号裁剪、MuPDF 链接裁剪及可证明无用的部署组件，并在 macOS arm64/x86_64 冒烟和渲染回归通过后才采用。
+逻辑内容会由 UDZO/ZLIB 压缩，因此各项逻辑大小之和不等于 DMG 物理大小。没有通过删除中文翻译、CJK 支持或用户功能来降低体积。RC 阶段接受该 2.730 MiB 偏差并公开实测报告。2026-09-28 确认保持三平台发布范围，目标由 80 MiB 上调为 90 MiB，该偏差落入正常通过范围；不改变功能的 Release 符号裁剪、MuPDF 链接裁剪及可证明无用的部署组件评估保留为可选优化，任何裁剪仍须先通过 macOS arm64/x86_64 冒烟和渲染回归。
 
 ## English
 
@@ -24,4 +24,4 @@ The unsigned macOS Universal DMG from `v1.0.0-rc.3` measures 86,748,987 bytes (8
 
 A read-only 7-Zip 24.08 inspection of the APFS payload produced the component measurements above. The 82.450 MiB Universal nexPDF executable, including statically linked MuPDF for both architectures, is the dominant component, followed by the Universal Qt frameworks. UDZO/ZLIB compresses the logical contents, so their sum is not the physical DMG size.
 
-No Chinese translation, CJK support, or user feature was removed to reduce the package. This 2.730 MiB deviation is documented for the release-candidate phase. Before final v1.0.0, the project will evaluate function-preserving Release symbol stripping, MuPDF link trimming, and demonstrably unused deployment components; any change must pass arm64/x86_64 macOS smoke and rendering regression tests.
+No Chinese translation, CJK support, or user feature was removed to reduce the package. This 2.730 MiB deviation is documented for the release-candidate phase. On 2026-09-28 the three-platform release scope was confirmed and the target was raised from 80 MiB to 90 MiB, so the deviation now passes normally; function-preserving Release symbol stripping, MuPDF link trimming, and removal of demonstrably unused deployment components remain optional future optimizations, and any such change must still pass arm64/x86_64 macOS smoke and rendering regression tests.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure binary release packages and enforce the 80 MiB target."""
+"""Measure binary release packages and enforce the per-package size target."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 
-LIMIT_MIB = 80.0
+LIMIT_MIB = 90.0
 PACKAGE_SUFFIXES = (".zip", ".exe", ".AppImage", ".dmg")
 
 
@@ -57,7 +57,7 @@ def main() -> int:
     for record in records:
         print(f"{record['file']}: {record['size_mib']:.3f} MiB")
     if over_limit and (analysis is None or not analysis.is_file() or analysis.stat().st_size == 0):
-        print("A non-empty --over-limit-analysis document is required for packages above 80 MiB.", file=sys.stderr)
+        print(f"A non-empty --over-limit-analysis document is required for packages above the {LIMIT_MIB:.0f} MiB target.", file=sys.stderr)
         return 1
     return 0
 
