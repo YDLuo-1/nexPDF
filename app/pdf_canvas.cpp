@@ -40,6 +40,8 @@ void PdfCanvas::setDocument(const nexpdf::DocumentInfo &info)
     pending_.clear();
     requestKeys_.clear();
     requestDensities_.clear();
+    searchHits_.clear();
+    activeHit_ = -1;
     selectionRect_ = {};
     rebuildLayout();
 }
@@ -52,9 +54,58 @@ void PdfCanvas::clearDocument()
     pending_.clear();
     requestKeys_.clear();
     requestDensities_.clear();
+    searchHits_.clear();
+    activeHit_ = -1;
     selectionRect_ = {};
     resize(1, 1);
     update();
+}
+
+void PdfCanvas::setSearchHits(const QVector<nexpdf::SearchHit> &hits)
+{
+    searchHits_ = hits;
+    activeHit_ = hits.isEmpty() ? -1 : 0;
+    update();
+}
+
+void PdfCanvas::setActiveHit(const int index)
+{
+    if (searchHits_.isEmpty()) {
+        return;
+    }
+    const int bounded = std::clamp(index, 0, static_cast<int>(searchHits_.size()) - 1);
+    if (activeHit_ == bounded) {
+        return;
+    }
+    activeHit_ = bounded;
+    update();
+}
+
+void PdfCanvas::revealActiveHit()
+{
+    if (activeHit_ < 0 || activeHit_ >= searchHits_.size()) {
+        return;
+    }
+    const nexpdf::SearchHit &hit = searchHits_[activeHit_];
+    if (hit.pageIndex < 0 || hit.pageIndex >= pages_.size()) {
+        return;
+    }
+    auto *area = qobject_cast<QScrollArea *>(parentWidget()->parentWidget());
+    if (area == nullptr) {
+        return;
+    }
+    const PageLayout &layout = pages_[hit.pageIndex];
+    if (hit.quads.isEmpty()) {
+        area->verticalScrollBar()->setValue(layout.rect.top());
+        return;
+    }
+    QRectF bounds = hit.quads.first();
+    for (const QRectF &quad : hit.quads) {
+        bounds = bounds.united(quad);
+    }
+    const int y = layout.rect.top() + qRound(bounds.top() * zoom_);
+    const int target = y - area->viewport()->height() / 3;
+    area->verticalScrollBar()->setValue(std::clamp(target, 0, area->verticalScrollBar()->maximum()));
 }
 
 void PdfCanvas::setZoom(const qreal zoom)
@@ -181,6 +232,20 @@ void PdfCanvas::paintEvent(QPaintEvent *event)
             painter.setCompositionMode(QPainter::CompositionMode_Multiply);
             painter.fillRect(pageRect, QColor(0xC8, 0xE6, 0xC9));
             painter.restore();
+        }
+        for (int hitIndex = 0; hitIndex < searchHits_.size(); ++hitIndex) {
+            const nexpdf::SearchHit &hit = searchHits_[hitIndex];
+            if (hit.pageIndex != index) {
+                continue;
+            }
+            const bool active = hitIndex == activeHit_;
+            painter.setBrush(active ? QColor(255, 150, 0, 170) : QColor(255, 214, 0, 95));
+            painter.setPen(active ? QPen(QColor(200, 100, 0)) : Qt::NoPen);
+            for (const QRectF &quad : hit.quads) {
+                painter.drawRect(QRectF(pageRect.left() + quad.left() * zoom_,
+                                        pageRect.top() + quad.top() * zoom_,
+                                        quad.width() * zoom_, quad.height() * zoom_));
+            }
         }
         if (!drewTile) {
             painter.setPen(Qt::gray);

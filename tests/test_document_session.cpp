@@ -394,7 +394,21 @@ void DocumentSessionTests::editsPagesAnnotationsAndJournal()
     request.pageIndex = 0;
     verification.requestRender(request);
     QTRY_COMPARE_WITH_TIMEOUT(rendered.size(), 1, 5000);
-    QVERIFY(!qvariant_cast<nexpdf::RenderResult>(rendered.first().first()).image.isNull());
+    const auto editedRender = qvariant_cast<nexpdf::RenderResult>(rendered.first().first()).image;
+    QVERIFY(!editedRender.isNull());
+    // The FreeText box must not render as a solid color block: MuPDF paints /C
+    // as the box background, so the box is white and only the glyphs are red.
+    const QRect box((int)resizeText.bounds.right() - 200, (int)resizeText.bounds.bottom() - 50, 200, 50);
+    const QImage cropped = editedRender.copy(box);
+    qint64 colored = 0;
+    for (int y = 0; y < cropped.height(); ++y) {
+        for (int x = 0; x < cropped.width(); ++x) {
+            const QColor pixel = cropped.pixelColor(x, y);
+            if (pixel.red() > 170 && pixel.green() < 110 && pixel.blue() < 110) ++colored;
+        }
+    }
+    QVERIFY2(colored * 2 < (qint64)cropped.width() * cropped.height(),
+             "FreeText box must not be filled with the text color");
     retainArtifact(output, QStringLiteral("edited.pdf"));
 }
 

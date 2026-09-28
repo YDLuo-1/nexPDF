@@ -960,6 +960,11 @@ public:
                 pdf_set_annot_color(context, annot, 3, annotationColor.data());
 
                 if (type == PDF_ANNOT_FREE_TEXT) {
+                    // MuPDF's FreeText appearance paints /C as the box background
+                    // and the default-appearance color as the text, so /C must
+                    // stay light or dark text disappears into the box.
+                    const float boxBackground[3] = {1.0f, 1.0f, 1.0f};
+                    pdf_set_annot_color(context, annot, 3, boxBackground);
                     pdf_set_annot_contents(context, annot, text.constData());
                     pdf_set_annot_default_appearance(context, annot, "Helv",
                         static_cast<float>(std::max<qreal>(1.0, operation.fontSize)),

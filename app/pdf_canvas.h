@@ -27,6 +27,11 @@ public:
     void goToPage(int pageIndex);
     void restorePosition(int pageIndex, qreal pageFraction);
     [[nodiscard]] qreal currentPageFraction() const;
+    void setSearchHits(const QVector<nexpdf::SearchHit> &hits);
+    void setActiveHit(int index);
+    void revealActiveHit();
+    [[nodiscard]] int activeHit() const noexcept { return activeHit_; }
+    [[nodiscard]] int hitCount() const noexcept { return searchHits_.size(); }
 
 signals:
     void currentPageChanged(int pageIndex);
@@ -69,6 +74,8 @@ private:
     bool eyeCare_ = false;
     quint64 revision_ = 0;
     quint64 nextRequestId_ = 1;
+    QVector<nexpdf::SearchHit> searchHits_;
+    int activeHit_ = -1;
     QPoint dragStart_;
     QPoint dragEnd_;
     QRect selectionRect_;

@@ -141,6 +141,9 @@ private:
     QHash<quint64, qreal> thumbnailDensities_;
     QSet<int> pendingThumbnailPages_;
     QString currentFingerprint_;
+    QString activeSearchQuery_;
+    QString pendingText_;
+    QString pendingImagePath_;
     bool eyeCare_ = false;
     bool restoringPosition_ = false;
     QTimer *positionSaveTimer_ = nullptr;

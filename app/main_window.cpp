@@ -87,6 +87,9 @@ MainWindow::MainWindow(QWidget *parent)
         saveReadingPosition();
         currentPath_.clear();
         currentFingerprint_.clear();
+        activeSearchQuery_.clear();
+        pendingText_.clear();
+        pendingImagePath_.clear();
         pageCount_ = 0;
         modified_ = false;
         canvas_->clearDocument();
@@ -144,10 +147,14 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(&session_, &nexpdf::DocumentSession::searchFinished, this,
             [this](const QVector<nexpdf::SearchHit> &hits) {
-        statusLabel_->setText(QStringLiteral("%1: %2").arg(tr("Search")).arg(hits.size()));
-        if (!hits.isEmpty()) {
-            canvas_->goToPage(hits.first().pageIndex);
+        canvas_->setSearchHits(hits);
+        if (hits.isEmpty()) {
+            statusLabel_->setText(tr("No search matches"));
+            return;
         }
+        canvas_->setActiveHit(0);
+        canvas_->revealActiveHit();
+        statusLabel_->setText(tr("Match 1 of %1 — Enter for next").arg(hits.size()));
     });
     connect(&session_, &nexpdf::DocumentSession::textExtracted, this,
             [this](const int, const QRectF &, const QString &text) {
@@ -184,6 +191,28 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(canvas_, &PdfCanvas::regionSelected, this,
             [this](const int page, const QRectF &bounds) {
+        if (!pendingText_.isEmpty()) {
+            nexpdf::EditOperation operation;
+            operation.kind = nexpdf::EditKind::AddText;
+            operation.pageIndex = page;
+            operation.bounds = bounds.normalized();
+            operation.text = pendingText_;
+            operation.fontSize = std::clamp(qRound(bounds.height() * 0.55), 8, 96);
+            operation.color = Qt::black;
+            pendingText_.clear();
+            session_.applyEdit(operation);
+            return;
+        }
+        if (!pendingImagePath_.isEmpty()) {
+            nexpdf::EditOperation operation;
+            operation.kind = nexpdf::EditKind::AddImage;
+            operation.pageIndex = page;
+            operation.bounds = bounds.normalized();
+            operation.imagePath = pendingImagePath_;
+            pendingImagePath_.clear();
+            session_.applyEdit(operation);
+            return;
+        }
         const QAction *tool = selectionActionGroup_->checkedAction();
         if (tool == nullptr) {
             session_.extractText(page, bounds);
@@ -661,7 +690,23 @@ void MainWindow::buildMenus()
     searchEdit_->setMaximumWidth(240);
     searchEdit_->addAction(nexpdf::icons::actionIcon(Kind::Search), QLineEdit::LeadingPosition);
     toolbar->addWidget(searchEdit_);
-    connect(searchEdit_, &QLineEdit::returnPressed, this, [this] { session_.search(searchEdit_->text()); });
+    connect(searchEdit_, &QLineEdit::returnPressed, this, [this] {
+        const QString query = searchEdit_->text().trimmed();
+        if (query.isEmpty()) {
+            return;
+        }
+        if (query == activeSearchQuery_) {
+            if (canvas_->hitCount() > 0) {
+                canvas_->setActiveHit((canvas_->activeHit() + 1) % canvas_->hitCount());
+                canvas_->revealActiveHit();
+                statusLabel_->setText(tr("Match %1 of %2")
+                    .arg(canvas_->activeHit() + 1).arg(canvas_->hitCount()));
+            }
+            return;
+        }
+        activeSearchQuery_ = query;
+        session_.search(query);
+    });
 
     addToolBarBreak(Qt::TopToolBarArea);
     auto *editToolbar = addToolBar(QStringLiteral("edit"));
@@ -1086,14 +1131,9 @@ void MainWindow::addTextObject()
     const QString text = QInputDialog::getMultiLineText(this, tr("Add text…"),
         tr("Add text…"), {}, &accepted);
     if (!accepted || text.trimmed().isEmpty()) return;
-    nexpdf::EditOperation operation;
-    operation.kind = nexpdf::EditKind::AddText;
-    operation.pageIndex = canvas_->currentPage();
-    operation.bounds = QRectF(54, 54, 360, 90);
-    operation.text = text;
-    operation.fontSize = 16;
-    operation.color = Qt::black;
-    session_.applyEdit(operation);
+    pendingImagePath_.clear();
+    pendingText_ = text;
+    statusLabel_->setText(tr("Drag a rectangle on the page to place the text"));
 }
 
 void MainWindow::addImageObject()
@@ -1102,12 +1142,9 @@ void MainWindow::addImageObject()
     const QString path = QFileDialog::getOpenFileName(this, tr("Add image…"), {},
         QStringLiteral("Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff)"));
     if (path.isEmpty()) return;
-    nexpdf::EditOperation operation;
-    operation.kind = nexpdf::EditKind::AddImage;
-    operation.pageIndex = canvas_->currentPage();
-    operation.bounds = QRectF(54, 54, 300, 220);
-    operation.imagePath = path;
-    session_.applyEdit(operation);
+    pendingText_.clear();
+    pendingImagePath_ = path;
+    statusLabel_->setText(tr("Drag a rectangle on the page to place the image"));
 }
 
 void MainWindow::addTextWatermark()
