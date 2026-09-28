@@ -1,0 +1,3 @@
+#pragma once
+
+#define NEXPDF_VERSION "@NEXPDF_VERSION@"

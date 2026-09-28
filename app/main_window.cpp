@@ -2,7 +2,8 @@
 
 #include "app_icons.h"
 #include "pdf_canvas.h"
-#include "version.h"
+
+#include "nexpdf/version.h"
 
 #include <QAction>
 #include <QActionGroup>

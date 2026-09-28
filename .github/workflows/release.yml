@@ -64,7 +64,8 @@ jobs:
           tools/Build-MuPDFWindows.ps1 -Configuration Release
           cmake -S . -B build/release -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" `
-            -DMUPDF_ROOT="$pwd/out/mupdf-windows-x64"
+            -DMUPDF_ROOT="$pwd/out/mupdf-windows-x64" `
+            -DNEXPDF_VERSION="$env:RELEASE_TAG"
           cmake --build build/release --config Release --parallel 3
           $env:NEXPDF_TEST_OUTPUT_DIR = "$env:RUNNER_TEMP/nexpdf-test-output"
           ctest --test-dir build/release -C Release --output-on-failure
@@ -167,7 +168,8 @@ jobs:
           cmake -S . -B build/release -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
-            -DMUPDF_ROOT="$RUNNER_TEMP/mupdf-prefix"
+            -DMUPDF_ROOT="$RUNNER_TEMP/mupdf-prefix" \
+            -DNEXPDF_VERSION="$RELEASE_TAG"
           cmake --build build/release --parallel 3
           NEXPDF_TEST_OUTPUT_DIR="$RUNNER_TEMP/nexpdf-test-output" ctest --test-dir build/release --output-on-failure
           cmake --install build/release --prefix "$PWD/AppDir/usr"
@@ -244,7 +246,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
             -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
-            -DMUPDF_ROOT="$RUNNER_TEMP/mupdf-prefix"
+            -DMUPDF_ROOT="$RUNNER_TEMP/mupdf-prefix" \
+            -DNEXPDF_VERSION="$RELEASE_TAG"
           cmake --build build/release --parallel 3
           NEXPDF_TEST_OUTPUT_DIR="$RUNNER_TEMP/nexpdf-test-output" ctest --test-dir build/release --output-on-failure
           cmake --install build/release --prefix "$PWD/stage"

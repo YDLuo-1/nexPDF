@@ -15,7 +15,6 @@ target_link_libraries(nexpdf_core
   PUBLIC Qt6::Core Qt6::Gui)
 
 target_compile_definitions(nexpdf_core
-  PUBLIC NEXPDF_VERSION="${PROJECT_VERSION}"
   PRIVATE QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
 
 if(MSVC)

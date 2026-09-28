@@ -14,7 +14,8 @@ qt_add_resources(nexpdf_app_ui "nexpdf_assets"
   BASE assets
   FILES assets/nexpdf-256.png)
 
-target_include_directories(nexpdf_app_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(nexpdf_app_ui
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(nexpdf_app_ui PUBLIC nexpdf_core Qt6::Core Qt6::Gui Qt6::Widgets)
 target_compile_definitions(nexpdf_app_ui PUBLIC QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
 

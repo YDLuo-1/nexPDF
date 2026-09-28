@@ -6,6 +6,9 @@ endif()
 
 project(nexPDF VERSION 1.0.0 LANGUAGES CXX)
 
+set(NEXPDF_VERSION "${PROJECT_VERSION}" CACHE STRING "Version string reported by nexPDF --version; release packaging passes the release tag")
+configure_file(app/version.h.in "${CMAKE_BINARY_DIR}/generated/nexpdf/version.h" @ONLY)
+
 option(NEXPDF_BUILD_APP "Build the Qt desktop application" ON)
 option(NEXPDF_BUILD_TESTS "Build tests" ON)
 option(NEXPDF_BUILD_BENCHMARKS "Build the corpus benchmark tool" OFF)
@@ -43,7 +46,7 @@ if(NEXPDF_BUILD_TESTS)
 endif()
 
 if(NEXPDF_BUILD_BENCHMARKS)
-  add_subdirectory(benchmarks)
+  add_subdirectory(tests/benchmarks)
 endif()
 
 include(GNUInstallDirs)

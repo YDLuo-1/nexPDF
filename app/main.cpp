@@ -1,6 +1,7 @@
 #include "app_icons.h"
 #include "main_window.h"
-#include "version.h"
+
+#include "nexpdf/version.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
