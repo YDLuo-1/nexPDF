@@ -12,6 +12,7 @@
 #include <QCheckBox>
 #include <QClipboard>
 #include <QComboBox>
+#include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDockWidget>
@@ -73,13 +74,19 @@ MainWindow::MainWindow(QWidget *parent)
         pageLabel_->setText(QStringLiteral("1 / %1").arg(pageCount_));
         setWindowTitle(QStringLiteral("%1 — nexPDF").arg(info.title));
         statusLabel_->setText(tr("Ready"));
+        currentFingerprint_ = info.fingerprint;
+        if (!currentFingerprint_.isEmpty()) {
+            QTimer::singleShot(0, this, [this] { restoreReadingPosition(); });
+        }
         if (signedDocument_) {
             QMessageBox::warning(this, tr("Signed document"),
                 tr("Editing this document invalidates its digital signatures. It must be saved to a new file."));
         }
     });
     connect(&session_, &nexpdf::DocumentSession::closed, this, [this] {
+        saveReadingPosition();
         currentPath_.clear();
+        currentFingerprint_.clear();
         pageCount_ = 0;
         modified_ = false;
         canvas_->clearDocument();
@@ -173,6 +180,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(canvas_, &PdfCanvas::currentPageChanged, this, [this](const int page) {
         thumbnailList_->setCurrentRow(page);
         pageLabel_->setText(QStringLiteral("%1 / %2").arg(page + 1).arg(pageCount_));
+        positionSaveTimer_->start();
     });
     connect(canvas_, &PdfCanvas::regionSelected, this,
             [this](const int page, const QRectF &bounds) {
@@ -236,6 +244,13 @@ MainWindow::MainWindow(QWidget *parent)
     const QString language = settings.value(QStringLiteral("ui/language"), QStringLiteral("system")).toString();
     setChinese(language == QStringLiteral("zh")
         || (language == QStringLiteral("system") && QLocale::system().language() == QLocale::Chinese));
+    eyeCare_ = settings.value(QStringLiteral("ui/eyeCare"), false).toBool();
+    canvas_->setEyeCare(eyeCare_);
+    eyeCareAction_->setChecked(eyeCare_);
+    positionSaveTimer_ = new QTimer(this);
+    positionSaveTimer_->setSingleShot(true);
+    positionSaveTimer_->setInterval(800);
+    connect(positionSaveTimer_, &QTimer::timeout, this, &MainWindow::saveReadingPosition);
 }
 
 void MainWindow::openFile(const QString &path)
@@ -247,6 +262,7 @@ void MainWindow::openFile(const QString &path)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    saveReadingPosition();
     if (confirmDiscard()) {
         event->accept();
     } else {
@@ -340,6 +356,70 @@ void MainWindow::acceptThumbnailRender(const nexpdf::RenderResult &result)
     }
 }
 
+void MainWindow::saveReadingPosition()
+{
+    if (restoringPosition_ || currentFingerprint_.isEmpty() || pageCount_ <= 0) {
+        return;
+    }
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("readingPositions"));
+    settings.setValue(currentFingerprint_, QStringLiteral("%1 %2 %3")
+        .arg(canvas_->currentPage())
+        .arg(canvas_->currentPageFraction(), 0, 'f', 4)
+        .arg(QDateTime::currentSecsSinceEpoch()));
+    constexpr int kMaxTrackedDocuments = 200;
+    const QStringList keys = settings.childKeys();
+    if (keys.size() > kMaxTrackedDocuments) {
+        QList<QPair<qint64, QString>> entries;
+        entries.reserve(keys.size());
+        for (const QString &key : keys) {
+            entries.emplace_back(
+                settings.value(key).toString().section(QLatin1Char(' '), 2, 2).toLongLong(), key);
+        }
+        std::sort(entries.begin(), entries.end());
+        for (int i = 0; i < entries.size() - kMaxTrackedDocuments; ++i) {
+            settings.remove(entries[i].second);
+        }
+    }
+    settings.endGroup();
+}
+
+void MainWindow::restoreReadingPosition()
+{
+    if (currentFingerprint_.isEmpty() || pageCount_ <= 0) {
+        return;
+    }
+    QSettings settings;
+    const QString saved = settings.value(QStringLiteral("readingPositions/") + currentFingerprint_).toString();
+    const QStringList parts = saved.split(QLatin1Char(' '));
+    if (parts.size() < 2) {
+        return;
+    }
+    bool pageOk = false;
+    bool fractionOk = false;
+    const int page = parts.at(0).toInt(&pageOk);
+    const qreal fraction = parts.at(1).toDouble(&fractionOk);
+    if (!pageOk || !fractionOk || page < 0 || page >= pageCount_) {
+        return;
+    }
+    restoringPosition_ = true;
+    thumbnailList_->setCurrentRow(page);
+    QTimer::singleShot(0, this, [this, page, fraction] {
+        canvas_->restorePosition(page, fraction);
+        restoringPosition_ = false;
+    });
+}
+
+void MainWindow::setEyeCareEnabled(const bool enabled)
+{
+    eyeCare_ = enabled;
+    canvas_->setEyeCare(enabled);
+    if (eyeCareAction_->isChecked() != enabled) {
+        eyeCareAction_->setChecked(enabled);
+    }
+    QSettings().setValue(QStringLiteral("ui/eyeCare"), enabled);
+}
+
 void MainWindow::buildUi()
 {
     auto *splitter = new QSplitter(this);
@@ -389,6 +469,7 @@ void MainWindow::buildMenus()
     zoomInAction_ = new QAction(this);
     zoomOutAction_ = new QAction(this);
     actualSizeAction_ = new QAction(this);
+    eyeCareAction_ = new QAction(this);
     previousPageAction_ = new QAction(this);
     nextPageAction_ = new QAction(this);
     addTextAction_ = new QAction(this);
@@ -450,6 +531,8 @@ void MainWindow::buildMenus()
     zoomOutAction_->setShortcut(QKeySequence::ZoomOut);
     englishAction_->setCheckable(true);
     chineseAction_->setCheckable(true);
+    eyeCareAction_->setCheckable(true);
+    connect(eyeCareAction_, &QAction::toggled, this, &MainWindow::setEyeCareEnabled);
     selectionActionGroup_ = new QActionGroup(this);
     selectionActionGroup_->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
     const QList<QPair<QAction *, nexpdf::EditKind>> selectionActions = {
@@ -539,6 +622,8 @@ void MainWindow::buildMenus()
     auto *viewMenu = menuBar()->addMenu(QString());
     viewMenu->setObjectName(QStringLiteral("viewMenu"));
     viewMenu->addActions({zoomInAction_, zoomOutAction_, actualSizeAction_, previousPageAction_, nextPageAction_});
+    viewMenu->addSeparator();
+    viewMenu->addAction(eyeCareAction_);
     auto *settingsMenu = menuBar()->addMenu(QString());
     settingsMenu->setObjectName(QStringLiteral("settingsMenu"));
     auto *languageMenu = settingsMenu->addMenu(QString());
@@ -708,6 +793,7 @@ void MainWindow::retranslateUi()
     zoomInAction_->setText(tr("Zoom in"));
     zoomOutAction_->setText(tr("Zoom out"));
     actualSizeAction_->setText(tr("Actual size"));
+    eyeCareAction_->setText(tr("Eye-care mode"));
     previousPageAction_->setText(tr("Previous page"));
     nextPageAction_->setText(tr("Next page"));
     addTextAction_->setText(tr("Add text…"));
@@ -739,7 +825,7 @@ void MainWindow::retranslateUi()
         openAction_, saveAsAction_, encryptAction_, decryptAction_, undoAction_, redoAction_,
         insertPageAction_, importPagesAction_, deletePageAction_, movePageUpAction_, movePageDownAction_,
         rotateLeftAction_, rotateRightAction_, zoomInAction_, zoomOutAction_, actualSizeAction_,
-        previousPageAction_, nextPageAction_, addTextAction_, addImageAction_, highlightAction_,
+        eyeCareAction_, previousPageAction_, nextPageAction_, addTextAction_, addImageAction_, highlightAction_,
         underlineAction_, strikeOutAction_, rectangleAction_, ellipseAction_, inkAction_, deleteObjectAction_
     };
     for (QAction *action : selfDescribingActions) setActionHint(action, action->text());
@@ -811,6 +897,7 @@ void MainWindow::retranslateUi()
 
 void MainWindow::openPath(const QString &path, const QString &password)
 {
+    saveReadingPosition();
     nexpdf::OpenOptions options;
     options.password = password;
     session_.open(path, options);

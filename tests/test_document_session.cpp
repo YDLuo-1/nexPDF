@@ -126,7 +126,9 @@ void DocumentSessionTests::opensRendersAndSearches()
 
     session.open(input);
     QTRY_COMPARE_WITH_TIMEOUT(opened.size(), 1, 5000);
-    QCOMPARE(qvariant_cast<nexpdf::DocumentInfo>(opened.first().first()).pageCount, 1);
+    const auto info = qvariant_cast<nexpdf::DocumentInfo>(opened.first().first());
+    QCOMPARE(info.pageCount, 1);
+    QVERIFY2(info.fingerprint.size() == 64, "Document fingerprint must be 64 hex characters");
 
     nexpdf::RenderRequest request;
     request.requestId = 7;

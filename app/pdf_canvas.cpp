@@ -93,6 +93,47 @@ void PdfCanvas::setCacheLimitMiB(const int mebibytes)
     cache_.setMaxCost((totalBudget - kMuPdfStoreMiB) * 1024);
 }
 
+void PdfCanvas::setEyeCare(const bool enabled)
+{
+    if (eyeCare_ == enabled) {
+        return;
+    }
+    eyeCare_ = enabled;
+    update();
+}
+
+void PdfCanvas::restorePosition(const int pageIndex, const qreal pageFraction)
+{
+    if (pageIndex < 0 || pageIndex >= pages_.size()) {
+        return;
+    }
+    auto *area = qobject_cast<QScrollArea *>(parentWidget()->parentWidget());
+    if (area == nullptr) {
+        return;
+    }
+    const QRect &rect = pages_[pageIndex].rect;
+    const int value = rect.top() + qRound(std::clamp(pageFraction, 0.0, 1.0) * rect.height());
+    area->verticalScrollBar()->setValue(std::clamp(value, 0, area->verticalScrollBar()->maximum()));
+}
+
+qreal PdfCanvas::currentPageFraction() const
+{
+    if (currentPage_ < 0 || currentPage_ >= pages_.size()) {
+        return 0.0;
+    }
+    auto *area = qobject_cast<QScrollArea *>(parentWidget() ? parentWidget()->parentWidget() : nullptr);
+    if (area == nullptr) {
+        return 0.0;
+    }
+    const PageLayout &layout = pages_[currentPage_];
+    if (layout.rect.height() <= 0) {
+        return 0.0;
+    }
+    const qreal fraction = (area->verticalScrollBar()->value() - layout.rect.top())
+        / static_cast<qreal>(layout.rect.height());
+    return std::clamp(fraction, 0.0, 1.0);
+}
+
 void PdfCanvas::goToPage(const int pageIndex)
 {
     if (pageIndex < 0 || pageIndex >= pages_.size()) {
@@ -132,6 +173,14 @@ void PdfCanvas::paintEvent(QPaintEvent *event)
                     drewTile = true;
                 }
             }
+        }
+        if (eyeCare_) {
+            // Multiply keeps strokes and images readable while tinting the page;
+            // white maps exactly to the tint color.
+            painter.save();
+            painter.setCompositionMode(QPainter::CompositionMode_Multiply);
+            painter.fillRect(pageRect, QColor(0xC8, 0xE6, 0xC9));
+            painter.restore();
         }
         if (!drewTile) {
             painter.setPen(Qt::gray);

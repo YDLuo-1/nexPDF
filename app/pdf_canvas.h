@@ -18,11 +18,15 @@ public:
     void setZoom(qreal zoom);
     void setRotation(int rotation);
     void setCacheLimitMiB(int mebibytes);
+    void setEyeCare(bool enabled);
+    [[nodiscard]] bool eyeCare() const noexcept { return eyeCare_; }
     [[nodiscard]] int currentPage() const noexcept { return currentPage_; }
     [[nodiscard]] qreal zoom() const noexcept { return zoom_; }
     [[nodiscard]] int rotation() const noexcept { return rotation_; }
     [[nodiscard]] bool hasRenderedContent() const noexcept { return !cache_.isEmpty(); }
     void goToPage(int pageIndex);
+    void restorePosition(int pageIndex, qreal pageFraction);
+    [[nodiscard]] qreal currentPageFraction() const;
 
 signals:
     void currentPageChanged(int pageIndex);
@@ -62,6 +66,7 @@ private:
     int currentPage_ = 0;
     int rotation_ = 0;
     qreal zoom_ = 1.0;
+    bool eyeCare_ = false;
     quint64 revision_ = 0;
     quint64 nextRequestId_ = 1;
     QPoint dragStart_;

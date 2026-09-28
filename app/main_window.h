@@ -59,6 +59,9 @@ private:
     void resetThumbnails();
     void requestVisibleThumbnails();
     void acceptThumbnailRender(const nexpdf::RenderResult &result);
+    void saveReadingPosition();
+    void restoreReadingPosition();
+    void setEyeCareEnabled(bool enabled);
 
     nexpdf::DocumentSession session_;
     AppTranslator chineseTranslator_;
@@ -109,6 +112,7 @@ private:
     QAction *zoomInAction_ = nullptr;
     QAction *zoomOutAction_ = nullptr;
     QAction *actualSizeAction_ = nullptr;
+    QAction *eyeCareAction_ = nullptr;
     QAction *previousPageAction_ = nullptr;
     QAction *nextPageAction_ = nullptr;
     QAction *addTextAction_ = nullptr;
@@ -136,6 +140,10 @@ private:
     QHash<quint64, int> thumbnailRequests_;
     QHash<quint64, qreal> thumbnailDensities_;
     QSet<int> pendingThumbnailPages_;
+    QString currentFingerprint_;
+    bool eyeCare_ = false;
+    bool restoringPosition_ = false;
+    QTimer *positionSaveTimer_ = nullptr;
     QRectF pendingObjectBounds_;
     int pendingObjectPage_ = -1;
     bool modified_ = false;

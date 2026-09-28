@@ -172,6 +172,7 @@ struct DocumentInfo {
     bool encrypted = false;
     bool signedDocument = false;
     quint64 revision = 0;
+    QString fingerprint;
 };
 
 } // namespace nexpdf

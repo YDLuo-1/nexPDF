@@ -104,6 +104,25 @@ int normalizedRotation(int rotation)
     return ((rotation + 45) / 90 * 90) % 360;
 }
 
+// Content-based document identity: size plus SHA-256 of the first and last 64 KiB.
+// Enough to recognize a file across renames and moves without reading whole
+// multi-gigabyte documents; stored locally only, never with the file path.
+QString computeFileFingerprint(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    constexpr qint64 kFingerprintEdge = 64 * 1024;
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    hash.addData(QByteArray::number(file.size()));
+    hash.addData(file.read(kFingerprintEdge));
+    if (file.size() > kFingerprintEdge && file.seek(file.size() - kFingerprintEdge)) {
+        hash.addData(file.read(kFingerprintEdge));
+    }
+    return QString::fromLatin1(hash.result().toHex());
+}
+
 struct RawRenderOutput {
     fz_pixmap *pixmap = nullptr;
     int pageWidth = 0;
@@ -512,6 +531,7 @@ public:
         info.encrypted = encrypted_;
         info.signedDocument = signedDocument_;
         info.revision = revision_;
+        info.fingerprint = computeFileFingerprint(path_);
         post([info](DocumentSession *owner) { emit owner->opened(info); });
         emitState();
     }
