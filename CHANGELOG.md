@@ -4,6 +4,8 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0-rc.6] - 2026-09-28
+
 ### Changed / 变更
 
 - Keep the three-platform release scope and raise the binary package size target from 80 MiB to 90 MiB so the measured 82.730 MiB macOS Universal DMG passes normally; over-target packages still require a non-empty composition analysis. / 保持三平台发布范围，二进制包体积目标由 80 MiB 上调至 90 MiB，使实测 82.730 MiB 的 macOS Universal DMG 正常通过；超过目标的包仍须提供非空组成分析。
