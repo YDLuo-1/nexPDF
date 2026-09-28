@@ -4,6 +4,14 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0-rc.8] - 2026-09-28
+
+### Fixed / 修复
+
+- Search matches are highlighted on the page and Enter cycles through them with automatic scrolling. / 搜索命中在页面上高亮显示，回车循环跳转并自动滚动定位。
+- "Add text" no longer renders as a solid color block: the FreeText box background is white while the text keeps the chosen color. / “添加文字”不再渲染为色块：文本框白底，文字保持所选颜色。
+- "Add text" and "Add image" are placed by dragging a rectangle on the page instead of a silent fixed location. / “添加文字”与“添加图片”改为在页面上拖拽矩形放置，不再静默落到固定位置。
+
 ## [1.0.0-rc.7] - 2026-09-28
 
 ### Fixed / 修复
