@@ -4,6 +4,16 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0-rc.10] - 2026-09-28
+
+### Fixed / 修复
+
+- Edits no longer reset the view: the scroll position is preserved when a revision rebuild keeps the same page layout. / 编辑不再导致视图重置：revision 重建且页面布局不变时保持滚动位置。
+
+### Added / 新增
+
+- Completed a full agent-driven Windows UI acceptance pass over the corpus (CJK, damaged xref, AES-256 password, optional layers, transparency, large image, search highlight, drag placement, reading-position restore). / 完成基于电脑控制的 Windows 界面验收：中文语料、损坏 xref、AES-256 密码、可选图层、透明度、大图、搜索高亮、拖拽放置与阅读位置恢复。
+
 ## [1.0.0-rc.9] - 2026-09-28
 
 ### Added / 新增

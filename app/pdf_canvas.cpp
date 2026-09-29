@@ -33,6 +33,12 @@ PdfCanvas::PdfCanvas(nexpdf::DocumentSession *session, QWidget *parent)
 
 void PdfCanvas::setDocument(const nexpdf::DocumentInfo &info)
 {
+    // An edit rebuilds the document (revision bump) but keeps the page layout;
+    // preserve the scroll position so edits do not teleport the view to the top.
+    auto *area = qobject_cast<QScrollArea *>(parentWidget() ? parentWidget()->parentWidget() : nullptr);
+    const int savedScroll = area ? area->verticalScrollBar()->value() : 0;
+    const bool sameLayout = info.pageCount == pageCount_ && pageCount_ > 0;
+
     pageCount_ = info.pageCount;
     revision_ = info.revision;
     currentPage_ = 0;
@@ -45,6 +51,10 @@ void PdfCanvas::setDocument(const nexpdf::DocumentInfo &info)
     activeHit_ = -1;
     selectionRect_ = {};
     rebuildLayout();
+    if (sameLayout && area) {
+        area->verticalScrollBar()->setValue(
+            std::clamp(savedScroll, 0, area->verticalScrollBar()->maximum()));
+    }
 }
 
 void PdfCanvas::clearDocument()
