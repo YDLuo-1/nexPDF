@@ -112,6 +112,7 @@ private:
     QAction *zoomInAction_ = nullptr;
     QAction *zoomOutAction_ = nullptr;
     QAction *actualSizeAction_ = nullptr;
+    QAction *fitWidthAction_ = nullptr;
     QAction *eyeCareAction_ = nullptr;
     QAction *previousPageAction_ = nullptr;
     QAction *nextPageAction_ = nullptr;

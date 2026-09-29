@@ -5,6 +5,7 @@
 #include <QPaintEvent>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QWheelEvent>
 
 #include <algorithm>
 #include <cmath>
@@ -183,6 +184,34 @@ qreal PdfCanvas::currentPageFraction() const
     const qreal fraction = (area->verticalScrollBar()->value() - layout.rect.top())
         / static_cast<qreal>(layout.rect.height());
     return std::clamp(fraction, 0.0, 1.0);
+}
+
+void PdfCanvas::wheelEvent(QWheelEvent *event)
+{
+    if (event->modifiers() & Qt::ControlModifier) {
+        const int steps = event->angleDelta().y() / 120;
+        if (steps != 0) {
+            emit zoomRequested(std::pow(1.2, steps));
+        }
+        event->accept();
+        return;
+    }
+    QWidget::wheelEvent(event);
+}
+
+qreal PdfCanvas::fitWidthZoom() const
+{
+    auto *area = qobject_cast<QScrollArea *>(parentWidget() ? parentWidget()->parentWidget() : nullptr);
+    if (area == nullptr || pages_.isEmpty()) {
+        return 1.0;
+    }
+    const PageLayout &layout = pages_[std::clamp(currentPage_, 0, static_cast<int>(pages_.size()) - 1)];
+    const qreal pointsWidth = layout.rect.width() * layout.pointsPerPixel;
+    if (pointsWidth <= 0.0) {
+        return 1.0;
+    }
+    const int available = area->viewport()->width() - 2 * kPageGap - 8;
+    return std::clamp(available / pointsWidth, 0.1, 6.0);
 }
 
 void PdfCanvas::goToPage(const int pageIndex)

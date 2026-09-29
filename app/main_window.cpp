@@ -40,6 +40,7 @@
 #include <QScrollBar>
 #include <QSettings>
 #include <QSet>
+#include <QShortcut>
 #include <QSplitter>
 #include <QStatusBar>
 #include <QToolBar>
@@ -498,6 +499,7 @@ void MainWindow::buildMenus()
     zoomInAction_ = new QAction(this);
     zoomOutAction_ = new QAction(this);
     actualSizeAction_ = new QAction(this);
+    fitWidthAction_ = new QAction(this);
     eyeCareAction_ = new QAction(this);
     previousPageAction_ = new QAction(this);
     nextPageAction_ = new QAction(this);
@@ -558,6 +560,8 @@ void MainWindow::buildMenus()
     redoAction_->setShortcut(QKeySequence::Redo);
     zoomInAction_->setShortcut(QKeySequence::ZoomIn);
     zoomOutAction_->setShortcut(QKeySequence::ZoomOut);
+    actualSizeAction_->setShortcut(QKeySequence(QStringLiteral("Ctrl+0")));
+    fitWidthAction_->setShortcut(QKeySequence(QStringLiteral("Ctrl+2")));
     englishAction_->setCheckable(true);
     chineseAction_->setCheckable(true);
     eyeCareAction_->setCheckable(true);
@@ -614,6 +618,22 @@ void MainWindow::buildMenus()
     connect(zoomInAction_, &QAction::triggered, this, [this] { canvas_->setZoom(canvas_->zoom() * 1.2); });
     connect(zoomOutAction_, &QAction::triggered, this, [this] { canvas_->setZoom(canvas_->zoom() / 1.2); });
     connect(actualSizeAction_, &QAction::triggered, this, [this] { canvas_->setZoom(1.0); });
+    connect(fitWidthAction_, &QAction::triggered, this, [this] { canvas_->setZoom(canvas_->fitWidthZoom()); });
+    connect(canvas_, &PdfCanvas::zoomRequested, this,
+            [this](const qreal factor) { canvas_->setZoom(canvas_->zoom() * factor); });
+    auto *findShortcut = new QShortcut(QKeySequence::Find, this);
+    connect(findShortcut, &QShortcut::activated, this, [this] {
+        searchEdit_->setFocus();
+        searchEdit_->selectAll();
+    });
+    auto *cancelShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+    connect(cancelShortcut, &QShortcut::activated, this, [this] {
+        if (!pendingText_.isEmpty() || !pendingImagePath_.isEmpty()) {
+            pendingText_.clear();
+            pendingImagePath_.clear();
+            statusLabel_->setText(tr("Placement cancelled"));
+        }
+    });
     connect(previousPageAction_, &QAction::triggered, this,
             [this] { canvas_->goToPage(std::max(0, canvas_->currentPage() - 1)); });
     connect(nextPageAction_, &QAction::triggered, this,
@@ -650,7 +670,8 @@ void MainWindow::buildMenus()
                           resizeObjectAction_, deleteObjectAction_, redactionPreviewAction_, applyRedactionsAction_});
     auto *viewMenu = menuBar()->addMenu(QString());
     viewMenu->setObjectName(QStringLiteral("viewMenu"));
-    viewMenu->addActions({zoomInAction_, zoomOutAction_, actualSizeAction_, previousPageAction_, nextPageAction_});
+    viewMenu->addActions({zoomInAction_, zoomOutAction_, actualSizeAction_, fitWidthAction_,
+                          previousPageAction_, nextPageAction_});
     viewMenu->addSeparator();
     viewMenu->addAction(eyeCareAction_);
     auto *settingsMenu = menuBar()->addMenu(QString());
@@ -693,6 +714,9 @@ void MainWindow::buildMenus()
     connect(searchEdit_, &QLineEdit::returnPressed, this, [this] {
         const QString query = searchEdit_->text().trimmed();
         if (query.isEmpty()) {
+            canvas_->setSearchHits({});
+            activeSearchQuery_.clear();
+            statusLabel_->setText(tr("Search cleared"));
             return;
         }
         if (query == activeSearchQuery_) {
@@ -838,6 +862,7 @@ void MainWindow::retranslateUi()
     zoomInAction_->setText(tr("Zoom in"));
     zoomOutAction_->setText(tr("Zoom out"));
     actualSizeAction_->setText(tr("Actual size"));
+    fitWidthAction_->setText(tr("Fit width"));
     eyeCareAction_->setText(tr("Eye-care mode"));
     previousPageAction_->setText(tr("Previous page"));
     nextPageAction_->setText(tr("Next page"));
@@ -870,7 +895,7 @@ void MainWindow::retranslateUi()
         openAction_, saveAsAction_, encryptAction_, decryptAction_, undoAction_, redoAction_,
         insertPageAction_, importPagesAction_, deletePageAction_, movePageUpAction_, movePageDownAction_,
         rotateLeftAction_, rotateRightAction_, zoomInAction_, zoomOutAction_, actualSizeAction_,
-        eyeCareAction_, previousPageAction_, nextPageAction_, addTextAction_, addImageAction_, highlightAction_,
+        fitWidthAction_, eyeCareAction_, previousPageAction_, nextPageAction_, addTextAction_, addImageAction_, highlightAction_,
         underlineAction_, strikeOutAction_, rectangleAction_, ellipseAction_, inkAction_, deleteObjectAction_
     };
     for (QAction *action : selfDescribingActions) setActionHint(action, action->text());

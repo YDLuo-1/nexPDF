@@ -32,14 +32,17 @@ public:
     void revealActiveHit();
     [[nodiscard]] int activeHit() const noexcept { return activeHit_; }
     [[nodiscard]] int hitCount() const noexcept { return searchHits_.size(); }
+    [[nodiscard]] qreal fitWidthZoom() const;
 
 signals:
     void currentPageChanged(int pageIndex);
+    void zoomRequested(qreal factor);
     void regionSelected(int pageIndex, const QRectF &pageRect);
     void pathSelected(int pageIndex, const QVector<QPointF> &pagePoints);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;

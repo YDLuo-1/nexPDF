@@ -4,6 +4,14 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0-rc.9] - 2026-09-28
+
+### Added / 新增
+
+- Hold Ctrl and roll the mouse wheel to zoom the page, and use the new "Fit width" view action (`Ctrl+2`, with `Ctrl+0` for actual size). / 按住 Ctrl 滚动鼠标滚轮缩放页面；新增"适合宽度"视图动作（`Ctrl+2`，`Ctrl+0` 为实际大小）。
+- `Ctrl+F` now focuses the search box, and pressing Enter on an empty search box clears the old highlights. / `Ctrl+F` 聚焦搜索框；空搜索回车清除旧高亮。
+- Escape cancels a pending "Add text"/"Add image" placement. / Esc 取消待放置的文字/图片。
+
 ## [1.0.0-rc.8] - 2026-09-28
 
 ### Fixed / 修复
