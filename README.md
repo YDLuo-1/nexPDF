@@ -24,6 +24,21 @@ nexPDF 是一个本地运行、跨平台的 PDF 查看与实用编辑工具，�
 
 PDF 权限主要依赖阅读器遵守，不能替代真正的数据访问控制。用户密码与所有者密码可以相同，但部分阅读器会优先识别为用户密码，导致所有者权限行为不可靠，因此界面会提示风险。请使用较长、唯一且非空的密码。外部 PDF 可能把水印烘焙进正文、图片或共享 XObject；nexPDF 不保证识别所有此类水印，也不会自动删除启发式候选。请仅处理您拥有权利或已获得授权的文件，并始终保留备份。
 
+### 安装
+
+Windows 便携包从 [Releases](https://github.com/YDLuo-1/nexPDF/releases) 直接下载；winget 清单见 [`packaging/winget`](packaging/winget)（已通过本地验证，正在提交 winget-pkgs），Scoop 清单见 [`packaging/scoop`](packaging/scoop)，可复制进自己的 bucket 使用。
+
+### 与同类工具对比
+
+| | nexPDF | SumatraPDF | PDF24 | 在线 PDF 工具 |
+|---|---|---|---|---|
+| 本地运行、不上传文档 | ✅ | ✅ | ✅ | ❌ 需上传 |
+| 真涂黑（移除底层内容，非画黑框） | ✅ 两阶段确认 | ❌ 无编辑 | 部分 | 视工具而定 |
+| 对象级精确去水印 | ✅ 可恢复原对象 | ❌ | ❌ | ❌ |
+| AES-256/128 加密与解密 | ✅ | ❌ | ✅ | 视工具而定 |
+| 开源（AGPL）、无广告、无捆绑 | ✅ | ✅ | ❌ 闭源安装器带推广 | ❌ |
+| 原生双语界面（中/英） | ✅ | 一般 | ✅ | 视工具而定 |
+
 ### 设计取舍
 
 nexPDF 的功能取舍围绕“本地、可信、可撤销”：
@@ -100,6 +115,21 @@ nexPDF is a local, cross-platform PDF viewer and practical editor built with C++
 - Interface: a hybrid command bar gives Open/Save, encryption, and higher-comprehension-cost edits an icon plus a short label, while familiar navigation/annotation commands stay compact; every action has bilingual tooltips and app icons are wired into Windows, Linux, and macOS packages.
 
 PDF permissions depend mainly on reader cooperation and are not a substitute for access control. User and owner passwords may match, but some readers try the user credential first and may not grant owner privileges, so the UI warns before continuing. Use long, unique, non-empty passwords. External PDFs may bake watermarks into page content, images, or shared XObjects. nexPDF cannot promise to detect all such marks and never auto-deletes heuristic candidates. Process only files you own or are authorized to modify, and always keep backups.
+
+### Install
+
+Grab the Windows portable ZIP from [Releases](https://github.com/YDLuo-1/nexPDF/releases); winget manifests live in [`packaging/winget`](packaging/winget) (validated locally, winget-pkgs submission in progress) and the Scoop manifest in [`packaging/scoop`](packaging/scoop) can be copied into your own bucket.
+
+### How it compares
+
+| | nexPDF | SumatraPDF | PDF24 | Online PDF tools |
+|---|---|---|---|---|
+| Runs locally, no upload | ✅ | ✅ | ✅ | ❌ upload required |
+| True redaction (removes content, not a black box) | ✅ two-stage | ❌ no editing | partial | varies |
+| Object-level exact watermark removal | ✅ restores originals | ❌ | ❌ | ❌ |
+| AES-256/128 encryption and decryption | ✅ | ❌ | ✅ | varies |
+| Open source (AGPL), no ads, no bundling | ✅ | ✅ | ❌ closed installer with offers | ❌ |
+| Native bilingual UI (Chinese/English) | ✅ | partial | ✅ | varies |
 
 ### Design decisions
 

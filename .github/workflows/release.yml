@@ -20,14 +20,14 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ env.RELEASE_TAG }}
           submodules: recursive
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.13"
-      - uses: jurplel/install-qt-action@v4.3.1
+      - uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
         with:
           version: 6.11.2
           arch: win64_msvc2022_64
@@ -134,7 +134,7 @@ jobs:
           foreach ($asset in @($zipPath, $setupPath)) {
             if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) { throw "Missing Windows release asset: $asset" }
           }
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-assets
           path: dist/*
@@ -144,14 +144,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ env.RELEASE_TAG }}
           submodules: recursive
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.13"
-      - uses: jurplel/install-qt-action@v4.3.1
+      - uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
         with:
           version: 6.11.2
           arch: linux_gcc_64
@@ -212,7 +212,7 @@ jobs:
           "dist/nexPDF-$RELEASE_TAG-linux-x86_64.AppImage" --appimage-extract-and-run --version
       - name: Preserve executable AppImage in tar artifact
         run: tar -C dist -czf "nexPDF-$RELEASE_TAG-linux-asset.tar.gz" "nexPDF-$RELEASE_TAG-linux-x86_64.AppImage"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: linux-assets
           path: nexPDF-${{ env.RELEASE_TAG }}-linux-asset.tar.gz
@@ -222,14 +222,14 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ env.RELEASE_TAG }}
           submodules: recursive
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.13"
-      - uses: jurplel/install-qt-action@v4.3.1
+      - uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
         with:
           version: 6.11.2
           arch: clang_64
@@ -283,7 +283,7 @@ jobs:
           mkdir -p dist
           hdiutil create -volname nexPDF -srcfolder stage/nexPDF.app -ov -format UDZO \
             "dist/nexPDF-$RELEASE_TAG-macos-universal-unsigned.dmg"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: macos-assets
           path: dist/*
@@ -292,7 +292,7 @@ jobs:
   source:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ env.RELEASE_TAG }}
           submodules: recursive
@@ -304,7 +304,7 @@ jobs:
           tar --exclude=.git --exclude=build --exclude=out --exclude=dist --exclude=.tools \
             -cf - . | tar -xf - -C "nexPDF-$RELEASE_TAG"
           tar -czf "dist/nexPDF-$RELEASE_TAG-source-full.tar.gz" "nexPDF-$RELEASE_TAG"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: source-assets
           path: dist/*
@@ -317,11 +317,11 @@ jobs:
       actions: read
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ env.RELEASE_TAG }}
           submodules: recursive
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: dist
           merge-multiple: true
@@ -334,7 +334,7 @@ jobs:
           test -f "docs/release-notes/$RELEASE_TAG.md"
           python tools/check_release_assets.py dist --over-limit-analysis docs/package-size-analysis.md
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@5113cdc90fd4d541c801c55356214017bf5ae34b # v3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: nexPDF ${{ env.RELEASE_TAG }}

@@ -47,6 +47,8 @@ void PdfCanvas::setDocument(const nexpdf::DocumentInfo &info)
     pending_.clear();
     requestKeys_.clear();
     requestDensities_.clear();
+    outstandingRequests_.clear();
+    retriedRequests_.clear();
     searchHits_.clear();
     activeHit_ = -1;
     selectionRect_ = {};
@@ -65,6 +67,8 @@ void PdfCanvas::clearDocument()
     pending_.clear();
     requestKeys_.clear();
     requestDensities_.clear();
+    outstandingRequests_.clear();
+    retriedRequests_.clear();
     searchHits_.clear();
     activeHit_ = -1;
     selectionRect_ = {};
@@ -131,6 +135,8 @@ void PdfCanvas::setZoom(const qreal zoom)
     pending_.clear();
     requestKeys_.clear();
     requestDensities_.clear();
+    outstandingRequests_.clear();
+    retriedRequests_.clear();
     rebuildLayout();
 }
 
@@ -146,6 +152,8 @@ void PdfCanvas::setRotation(const int rotation)
     pending_.clear();
     requestKeys_.clear();
     requestDensities_.clear();
+    outstandingRequests_.clear();
+    retriedRequests_.clear();
     rebuildLayout();
 }
 
@@ -359,19 +367,38 @@ void PdfCanvas::acceptRender(const nexpdf::RenderResult &result)
         return;
     }
     const QString key = request.value();
-    requestKeys_.erase(request);
     qreal density = 1.0;
     if (const auto recorded = requestDensities_.constFind(result.requestId); recorded != requestDensities_.constEnd()) {
         density = recorded.value();
-        requestDensities_.remove(result.requestId);
     }
-    pending_.remove(key);
     if (result.revision != revision_ || result.pageIndex < 0 || result.pageIndex >= pages_.size()) {
+        requestKeys_.erase(request);
+        requestDensities_.remove(result.requestId);
+        outstandingRequests_.remove(result.requestId);
+        retriedRequests_.remove(result.requestId);
+        pending_.remove(key);
         return;
     }
     if (result.image.isNull()) {
+        // Retry a transiently failed tile exactly once before giving up so a
+        // hiccup does not leave a permanently blank region.
+        if (!retriedRequests_.contains(result.requestId) && outstandingRequests_.contains(result.requestId)) {
+            retriedRequests_.insert(result.requestId);
+            session_->requestRender(outstandingRequests_.value(result.requestId));
+            return;
+        }
+        requestKeys_.erase(request);
+        requestDensities_.remove(result.requestId);
+        outstandingRequests_.remove(result.requestId);
+        retriedRequests_.remove(result.requestId);
+        pending_.remove(key);
         return;
     }
+    requestKeys_.erase(request);
+    requestDensities_.remove(result.requestId);
+    outstandingRequests_.remove(result.requestId);
+    retriedRequests_.remove(result.requestId);
+    pending_.remove(key);
     auto *image = new QImage(result.image);
     image->setDevicePixelRatio(density);
     cache_.insert(key, image, std::max(1, static_cast<int>(image->sizeInBytes() / 1024)));
@@ -441,6 +468,7 @@ void PdfCanvas::requestVisiblePages(const QRect &visible)
                 request.requestId = nextRequestId_++;
                 requestKeys_.insert(request.requestId, key);
                 requestDensities_.insert(request.requestId, density);
+                outstandingRequests_.insert(request.requestId, request);
                 request.revision = revision_;
                 request.pageIndex = index;
                 request.scale = zoom_ * density;

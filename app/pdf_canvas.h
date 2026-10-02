@@ -70,6 +70,8 @@ private:
     QSet<QString> pending_;
     QHash<quint64, QString> requestKeys_;
     QHash<quint64, qreal> requestDensities_;
+    QHash<quint64, nexpdf::RenderRequest> outstandingRequests_;
+    QSet<quint64> retriedRequests_;
     int pageCount_ = 0;
     int currentPage_ = 0;
     int rotation_ = 0;

@@ -42,16 +42,16 @@ jobs:
             aqt_source: ""
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           submodules: recursive
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.13"
 
       - name: Install Qt 6.11.2
-        uses: jurplel/install-qt-action@v4.3.1
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
         with:
           version: 6.11.2
           arch: ${{ matrix.qt_arch }}
@@ -214,7 +214,7 @@ jobs:
         run: build/ci/app/nexPDF.app/Contents/MacOS/nexPDF --version
 
       - name: Upload independent-validation outputs
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: validation-${{ runner.os }}
           path: ${{ runner.temp }}/nexpdf-test-output

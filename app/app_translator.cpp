@@ -129,7 +129,16 @@ AppTranslator::AppTranslator(QObject *parent) : QTranslator(parent)
         {"Passwords must be shorter than 128 UTF-8 bytes.", "密码的 UTF-8 长度必须小于 128 字节。"},
         {"The validated temporary file could not replace the destination.", "已校验临时文件无法替换目标文件。"},
         {"Undo failed.", "撤销失败。"}, {"Redo failed.", "重做失败。"},
-        {"The document has unsaved changes.", "文档包含未保存的修改。"}
+        {"The document has unsaved changes.", "文档包含未保存的修改。"},
+        {"Eye-care mode", "护眼模式"},
+        {"Fit width", "适合宽度"},
+        {"Match %1 of %2", "第 %1 / %2 处"},
+        {"Match 1 of %1 — Enter for next", "找到 %1 处 —— 按 Enter 跳到下一处"},
+        {"No search matches", "没有搜索结果"},
+        {"Search cleared", "已清除搜索高亮"},
+        {"Drag a rectangle on the page to place the text", "在页面上拖动一个矩形放置文字"},
+        {"Drag a rectangle on the page to place the image", "在页面上拖动一个矩形放置图片"},
+        {"Placement cancelled", "已取消放置"}
     };
     for (const auto &[english, chinese] : entries) {
         translations_.insert(QString::fromUtf8(english), QString::fromUtf8(chinese));

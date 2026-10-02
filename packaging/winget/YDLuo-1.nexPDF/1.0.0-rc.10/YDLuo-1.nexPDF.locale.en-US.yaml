@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+PackageIdentifier: YDLuo-1.nexPDF
+PackageVersion: 1.0.0-rc.10
+PackageLocale: en-US
+Publisher: YDLuo-1
+PublisherUrl: https://github.com/YDLuo-1
+PackageName: nexPDF
+PackageUrl: https://github.com/YDLuo-1/nexPDF
+License: AGPL-3.0-or-later
+LicenseUrl: https://github.com/YDLuo-1/nexPDF/blob/main/LICENSE
+ShortDescription: Local, privacy-first PDF viewer and practical editor.
+Description: |-
+  nexPDF is a local, cross-platform PDF viewer and practical editor built with C++20, Qt Widgets, and MuPDF.
+  It contains no telemetry, uploads no documents, and does not execute PDF JavaScript.
+  Editing highlights: two-stage permanent redaction, exact watermark removal with object-level restore,
+  AES-128/AES-256 encryption and decryption, page and annotation editing with MuPDF-journal undo/redo,
+  and validated atomic saving. Reading positions are remembered per document by content fingerprint.
+Tags:
+  - pdf
+  - editor
+  - viewer
+  - redaction
+  - watermark
+  - privacy
+ReleaseNotes: https://github.com/YDLuo-1/nexPDF/releases/tag/v1.0.0-rc.10
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0

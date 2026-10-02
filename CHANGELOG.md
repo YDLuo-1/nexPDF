@@ -4,6 +4,19 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0-rc.11] - 2026-09-28
+
+### Added / 新增
+
+- Complete Chinese mappings for every user-facing string plus a coverage checker (`tools/check_i18n_coverage.py`). / 补齐全部面向用户文字的中文映射，并新增覆盖检查脚本。
+- Distribution materials: validated winget manifests and a Scoop manifest with the official asset digest, plus a competitor comparison and install section in the README. / 分发物料：通过验证的 winget 清单、带官方资产摘要的 Scoop 清单，README 新增竞品对比与安装章节。
+- A libFuzzer harness for the open/render path with seed PDFs (Clang builds, `NEXPDF_BUILD_FUZZERS=ON`). / 面向打开/渲染路径的 libFuzzer 模糊测试目标与种子语料（Clang 构建，`NEXPDF_BUILD_FUZZERS=ON`）。
+- GitHub Actions are now pinned by commit SHA with Dependabot tracking weekly updates. / GitHub Actions 改为按提交 SHA 锁定，并由 Dependabot 每周跟踪更新。
+
+### Fixed / 修复
+
+- A transiently failed render tile is retried once instead of leaving a blank region. / 偶发失败的渲染瓦片会自动重试一次，不再留下空白区域。
+
 ## [1.0.0-rc.10] - 2026-09-28
 
 ### Fixed / 修复

@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
+# Winget manifest for nexPDF v1.0.0-rc.10
+# Validate locally: winget validate .
+# Submit: fork microsoft/winget-pkgs, copy this folder to manifests/y/YDLuo-1/nexPDF/1.0.0-rc.10, open a PR.
+PackageIdentifier: YDLuo-1.nexPDF
+PackageVersion: 1.0.0-rc.10
+Installers:
+  - InstallerLocale: en-US
+    Architecture: x64
+    InstallerType: zip
+    NestedInstallerType: portable
+    NestedInstallerFiles:
+      - RelativeFilePath: bin\nexPDF.exe
+        PortableCommandAlias: nexPDF
+    InstallerUrl: https://github.com/YDLuo-1/nexPDF/releases/download/v1.0.0-rc.10/nexPDF-v1.0.0-rc.10-windows-x64-portable.zip
+    InstallerSha256: 70C0A42641DEAF2126F045BF6F6C58F67CDFF25A9BC4B6D21B1BA8A41A577DE9
+    UpgradeBehavior: uninstallPrevious
+ManifestType: installer
+ManifestVersion: 1.9.0

@@ -12,6 +12,7 @@ configure_file(app/version.h.in "${CMAKE_BINARY_DIR}/generated/nexpdf/version.h"
 option(NEXPDF_BUILD_APP "Build the Qt desktop application" ON)
 option(NEXPDF_BUILD_TESTS "Build tests" ON)
 option(NEXPDF_BUILD_BENCHMARKS "Build the corpus benchmark tool" OFF)
+option(NEXPDF_BUILD_FUZZERS "Build libFuzzer harnesses (Clang only)" OFF)
 option(NEXPDF_ENABLE_SANITIZERS "Enable supported compiler sanitizers" OFF)
 set(NEXPDF_QT_VERSION "6.11.2" CACHE STRING "Exact Qt version used to build nexPDF")
 
@@ -47,6 +48,17 @@ endif()
 
 if(NEXPDF_BUILD_BENCHMARKS)
   add_subdirectory(tests/benchmarks)
+endif()
+
+if(NEXPDF_BUILD_FUZZERS)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "NEXPDF_BUILD_FUZZERS requires a Clang toolchain (libFuzzer)")
+  endif()
+  add_executable(nexpdf_fuzz_open tests/fuzz/document_open_fuzzer.cpp)
+  target_compile_features(nexpdf_fuzz_open PRIVATE cxx_std_20)
+  target_compile_options(nexpdf_fuzz_open PRIVATE -fsanitize=fuzzer -fno-omit-frame-pointer)
+  target_link_options(nexpdf_fuzz_open PRIVATE -fsanitize=fuzzer)
+  target_link_libraries(nexpdf_fuzz_open PRIVATE nexpdf_core Qt6::Core)
 endif()
 
 include(GNUInstallDirs)

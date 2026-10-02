@@ -1,0 +1,14 @@
+{
+    "version": "1.0.0-rc.10",
+    "description": "Local, privacy-first PDF viewer and practical editor with two-stage redaction and exact watermark removal.",
+    "homepage": "https://github.com/YDLuo-1/nexPDF",
+    "license": "AGPL-3.0-or-later",
+    "notes": "Windows may show SmartScreen because packages are not code-signed. Verify the SHA-256 digest shown on the GitHub release page.",
+    "url": "https://github.com/YDLuo-1/nexPDF/releases/download/v1.0.0-rc.10/nexPDF-v1.0.0-rc.10-windows-x64-portable.zip",
+    "hash": "70c0a42641deaf2126f045bf6f6c58f67cdff25a9bc4b6d21b1ba8a41a577de9",
+    "bin": [["bin\nexPDF.exe", "nexPDF"]],
+    "shortcuts": [["bin\nexPDF.exe", "nexPDF"]],
+    "checkver": {
+        "github": "https://github.com/YDLuo-1/nexPDF/releases"
+    }
+}
