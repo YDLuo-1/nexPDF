@@ -11,6 +11,7 @@
 #include <QCloseEvent>
 #include <QCheckBox>
 #include <QClipboard>
+#include <QColor>
 #include <QComboBox>
 #include <QDateTime>
 #include <QDialog>
@@ -34,6 +35,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPalette>
 #include <QPushButton>
 #include <QPolygonF>
 #include <QScrollArea>
@@ -68,6 +70,11 @@ MainWindow::MainWindow(QWidget *parent)
         signedDocument_ = info.signedDocument;
         pendingObjectBounds_ = {};
         pendingObjectPage_ = -1;
+        pendingText_.clear();
+        pendingImagePath_.clear();
+        activeSearchQuery_.clear();
+        searchEdit_->clear();
+        candidateList_->clear();
         modified_ = false;
         canvas_->setDocument(info);
         resetThumbnails();
@@ -76,6 +83,8 @@ MainWindow::MainWindow(QWidget *parent)
         setWindowTitle(QStringLiteral("%1 — nexPDF").arg(info.title));
         statusLabel_->setText(tr("Ready"));
         currentFingerprint_ = info.fingerprint;
+        setDocumentActionsEnabled(true);
+        updatePageActions();
         if (!currentFingerprint_.isEmpty()) {
             QTimer::singleShot(0, this, [this] { restoreReadingPosition(); });
         }
@@ -89,6 +98,7 @@ MainWindow::MainWindow(QWidget *parent)
         currentPath_.clear();
         currentFingerprint_.clear();
         activeSearchQuery_.clear();
+        searchEdit_->clear();
         pendingText_.clear();
         pendingImagePath_.clear();
         pageCount_ = 0;
@@ -101,6 +111,10 @@ MainWindow::MainWindow(QWidget *parent)
         pendingObjectBounds_ = {};
         pendingObjectPage_ = -1;
         setWindowTitle(QStringLiteral("nexPDF"));
+        setDocumentActionsEnabled(false);
+        pageLabel_->setText(QStringLiteral("0 / 0"));
+        statusLabel_->setText(tr("Ready"));
+        setWindowModified(false);
     });
     connect(&session_, &nexpdf::DocumentSession::passwordRequired, this,
             [this](const QString &path) {
@@ -109,13 +123,19 @@ MainWindow::MainWindow(QWidget *parent)
             tr("Enter the PDF password:"), QLineEdit::Password, {}, &accepted);
         if (accepted) {
             openPath(path, password);
+        } else {
+            statusLabel_->setText(tr("Ready"));
         }
     });
     connect(&session_, &nexpdf::DocumentSession::failed,
             this, &MainWindow::showError);
-    connect(&session_, &nexpdf::DocumentSession::saved, this, [this](const QString &path) {
+    connect(&session_, &nexpdf::DocumentSession::saved, this,
+            [this](const QString &path, const QString &fingerprint) {
         currentPath_ = path;
+        currentFingerprint_ = fingerprint;
+        signedDocument_ = false;
         modified_ = false;
+        setWindowTitle(QStringLiteral("%1 — nexPDF").arg(QFileInfo(path).completeBaseName()));
         statusLabel_->setText(tr("Ready"));
     });
     connect(&session_, &nexpdf::DocumentSession::stateChanged, this,
@@ -133,12 +153,23 @@ MainWindow::MainWindow(QWidget *parent)
             info.revision = revision_;
             canvas_->setDocument(info);
             resetThumbnails();
+            candidateList_->clear();
         }
         setWindowModified(modified_);
     });
     connect(&session_, &nexpdf::DocumentSession::pageCountChanged, this, [this](const int count) {
+        if (currentPath_.isEmpty()) {
+            return;
+        }
         pageCount_ = count;
         resetThumbnails();
+        updatePageActions();
+        if (count > 0) {
+            const int page = std::clamp(canvas_->currentPage(), 0, count - 1);
+            pageLabel_->setText(QStringLiteral("%1 / %2").arg(page + 1).arg(count));
+        } else {
+            pageLabel_->setText(QStringLiteral("0 / 0"));
+        }
     });
     connect(&session_, &nexpdf::DocumentSession::renderReady,
             this, &MainWindow::acceptThumbnailRender);
@@ -250,7 +281,21 @@ MainWindow::MainWindow(QWidget *parent)
             pendingObjectPage_ = -1;
         }
         operation.bounds = bounds;
-        operation.color = Qt::black;
+        switch (kind) {
+        case nexpdf::EditKind::AddHighlight:
+            // MuPDF multiplies /C over the page, so an opaque dark colour would
+            // hide the text. Markup gets readable, translucent defaults.
+            operation.color = QColor(255, 214, 0);
+            operation.opacity = 0.45;
+            break;
+        case nexpdf::EditKind::AddUnderline:
+        case nexpdf::EditKind::AddStrikeOut:
+            operation.color = QColor(206, 48, 48);
+            break;
+        default:
+            operation.color = Qt::black;
+            break;
+        }
         session_.applyEdit(operation);
     });
     connect(canvas_, &PdfCanvas::pathSelected, this,
@@ -450,6 +495,34 @@ void MainWindow::setEyeCareEnabled(const bool enabled)
     QSettings().setValue(QStringLiteral("ui/eyeCare"), enabled);
 }
 
+void MainWindow::setDocumentActionsEnabled(const bool enabled)
+{
+    for (QAction *action : documentActions_) {
+        action->setEnabled(enabled);
+    }
+    if (searchEdit_ != nullptr) {
+        searchEdit_->setEnabled(enabled);
+    }
+    if (!enabled) {
+        undoAction_->setEnabled(false);
+        redoAction_->setEnabled(false);
+        if (candidateList_ != nullptr) {
+            candidateList_->clear();
+        }
+    }
+}
+
+void MainWindow::updatePageActions()
+{
+    if (currentPath_.isEmpty()) {
+        return;
+    }
+    const bool multiPage = pageCount_ > 1;
+    deletePageAction_->setEnabled(multiPage);
+    movePageUpAction_->setEnabled(multiPage);
+    movePageDownAction_->setEnabled(multiPage);
+}
+
 void MainWindow::buildUi()
 {
     auto *splitter = new QSplitter(this);
@@ -464,6 +537,10 @@ void MainWindow::buildUi()
     scrollArea_->setWidget(canvas_);
     scrollArea_->setWidgetResizable(false);
     scrollArea_->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+    QPalette viewportPalette = scrollArea_->viewport()->palette();
+    viewportPalette.setColor(QPalette::Window, QColor(42, 44, 48));
+    scrollArea_->viewport()->setPalette(viewportPalette);
+    scrollArea_->viewport()->setAutoFillBackground(true);
     splitter->addWidget(thumbnailList_);
     splitter->addWidget(scrollArea_);
     splitter->setStretchFactor(1, 1);
@@ -754,6 +831,18 @@ void MainWindow::buildMenus()
     addLabeledAction(editToolbar, applyRedactionsAction_, QStringLiteral("applyRedactionsToolButton"),
                      Qt::ToolButtonTextUnderIcon);
 
+    documentActions_ = {saveAsAction_, encryptAction_, decryptAction_, closeAction_,
+                        insertPageAction_, importPagesAction_, deletePageAction_,
+                        movePageUpAction_, movePageDownAction_, rotateLeftAction_, rotateRightAction_,
+                        zoomInAction_, zoomOutAction_, actualSizeAction_, fitWidthAction_,
+                        previousPageAction_, nextPageAction_, addTextAction_, addImageAction_,
+                        highlightAction_, underlineAction_, strikeOutAction_, rectangleAction_,
+                        ellipseAction_, inkAction_, moveObjectAction_, resizeObjectAction_,
+                        deleteObjectAction_, redactionPreviewAction_, applyRedactionsAction_};
+    undoAction_->setEnabled(false);
+    redoAction_->setEnabled(false);
+    setDocumentActionsEnabled(false);
+
     retranslateUi();
 }
 
@@ -912,7 +1001,6 @@ void MainWindow::retranslateUi()
     }
     const QList<QPair<QString, QString>> compactLabels = {
         {QStringLiteral("openToolButton"), tr("Open")},
-        {QStringLiteral("saveAsToolButton"), tr("Save")},
         {QStringLiteral("encryptToolButton"), tr("Encrypt")},
         {QStringLiteral("decryptToolButton"), tr("Decrypt")}
     };

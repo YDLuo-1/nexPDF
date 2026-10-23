@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QColor>
 #include <QImage>
 #include <QMetaType>
@@ -9,6 +10,11 @@
 #include <QString>
 #include <QStringList>
 #include <QVector>
+
+#include <cstddef>
+#include <cstring>
+#include <utility>
+#include <vector>
 
 namespace nexpdf {
 
@@ -37,8 +43,70 @@ struct OperationError {
     [[nodiscard]] bool isError() const noexcept { return code != ErrorCode::None; }
 };
 
+// Owns a UTF-8 password with a deep copy and best-effort zeroization. Qt value
+// types share their buffers implicitly, so a plain QString cannot be wiped
+// without possibly clearing a copy that is still in use. SecurePassword stores
+// its own std::vector<char>; copies handed to queued signals are wiped when the
+// receiving lambda is destroyed.
+class SecurePassword final {
+public:
+    SecurePassword() = default;
+    SecurePassword(const QString &value)
+    {
+        QByteArray utf8 = value.toUtf8();
+        if (!utf8.isEmpty()) {
+            bytes_.assign(utf8.constData(), utf8.constData() + utf8.size());
+            utf8.detach();
+            std::memset(utf8.data(), 0, static_cast<std::size_t>(utf8.size()));
+        }
+    }
+    SecurePassword(const SecurePassword &other) : bytes_(other.bytes_) {}
+    SecurePassword(SecurePassword &&other) noexcept : bytes_(std::move(other.bytes_))
+    {
+        other.bytes_.clear();
+    }
+    SecurePassword &operator=(const SecurePassword &other)
+    {
+        if (this != &other) {
+            wipe();
+            bytes_ = other.bytes_;
+        }
+        return *this;
+    }
+    SecurePassword &operator=(SecurePassword &&other) noexcept
+    {
+        if (this != &other) {
+            wipe();
+            bytes_ = std::move(other.bytes_);
+            other.wipe();
+        }
+        return *this;
+    }
+    ~SecurePassword() { wipe(); }
+
+    [[nodiscard]] bool isEmpty() const noexcept { return bytes_.empty(); }
+    [[nodiscard]] QByteArray toUtf8() const
+    {
+        return bytes_.empty() ? QByteArray()
+                              : QByteArray(bytes_.data(), static_cast<qsizetype>(bytes_.size()));
+    }
+    void clear() noexcept { wipe(); }
+
+private:
+    void wipe() noexcept
+    {
+        if (bytes_.empty()) {
+            return;
+        }
+        std::memset(bytes_.data(), 0, bytes_.size());
+        bytes_.clear();
+    }
+
+    std::vector<char> bytes_;
+};
+
 struct OpenOptions {
-    QString password;
+    SecurePassword password;
     bool allowRepair = true;
 };
 
@@ -57,8 +125,8 @@ enum class EncryptionAlgorithm { Keep, None, Aes128, Aes256 };
 
 struct EncryptionOptions {
     EncryptionAlgorithm algorithm = EncryptionAlgorithm::Keep;
-    QString userPassword;
-    QString ownerPassword;
+    SecurePassword userPassword;
+    SecurePassword ownerPassword;
     DocumentPermissions permissions;
 };
 
@@ -95,7 +163,7 @@ struct EditOperation {
     QString text;
     QString objectId;
     QString sourcePath;
-    QString sourcePassword;
+    SecurePassword sourcePassword;
     QVector<int> sourcePages;
     QString imagePath;
     QColor color = QColor(255, 220, 0);

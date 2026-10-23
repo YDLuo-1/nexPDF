@@ -7,6 +7,8 @@
 #include <QSet>
 #include <QWidget>
 
+#include <optional>
+
 class PdfCanvas final : public QWidget {
     Q_OBJECT
 

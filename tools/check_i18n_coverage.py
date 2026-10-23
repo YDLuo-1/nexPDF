@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Check that every tr("...") source string in app sources has a Chinese mapping."""
+"""Check that every tr("...") source string in app and core sources has a Chinese mapping."""
 import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SOURCES = ["app/main_window.cpp", "app/pdf_canvas.cpp", "app/main.cpp"]
+SOURCES = [
+    "app/main_window.cpp",
+    "app/pdf_canvas.cpp",
+    "app/main.cpp",
+    "core/src/document_session.cpp",
+]
 TABLE = ROOT / "app" / "app_translator.cpp"
 
 src = "".join((ROOT / f).read_text(encoding="utf-8") for f in SOURCES)

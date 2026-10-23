@@ -108,6 +108,9 @@ private slots:
     void rendersAcrossDisplayListLruEviction();
     void scansAndRemovesStandardWatermarkAnnotation();
     void addsScansAndRemovesOwnWatermark();
+    void keepsCurrentDocumentWhenOpenFails();
+    void enforcesDocumentPermissions();
+    void removingWatermarkAfterRedactionKeepsRedaction();
 };
 
 void DocumentSessionTests::opensRendersAndSearches()
@@ -618,6 +621,217 @@ void DocumentSessionTests::addsScansAndRemovesOwnWatermark()
     QTRY_COMPARE_WITH_TIMEOUT(saved.size(), 1, 5000);
     retainArtifact(input, QStringLiteral("watermark-original.pdf"));
     retainArtifact(restoredPath, QStringLiteral("watermark-restored.pdf"));
+}
+
+void DocumentSessionTests::keepsCurrentDocumentWhenOpenFails()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString input = writeFixture(directory.path());
+    QVERIFY(!input.isEmpty());
+
+    nexpdf::DocumentSession session;
+    QSignalSpy opened(&session, &nexpdf::DocumentSession::opened);
+    QSignalSpy closed(&session, &nexpdf::DocumentSession::closed);
+    QSignalSpy failed(&session, &nexpdf::DocumentSession::failed);
+    QSignalSpy rendered(&session, &nexpdf::DocumentSession::renderReady);
+    session.open(input);
+    QTRY_COMPARE_WITH_TIMEOUT(opened.size(), 1, 5000);
+    const auto info = qvariant_cast<nexpdf::DocumentInfo>(opened.first().first());
+
+    const QString notPdf = directory.path() + QStringLiteral("/not-a-pdf.pdf");
+    {
+        QFile file(notPdf);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QVERIFY(file.write(QByteArrayLiteral("this is not a PDF")) > 0);
+    }
+    session.open(notPdf);
+    QTRY_COMPARE_WITH_TIMEOUT(failed.size(), 1, 5000);
+
+    // A failed open must not close the document that is already open.
+    QCOMPARE(closed.size(), 0);
+    nexpdf::RenderRequest request;
+    request.requestId = 5;
+    request.revision = info.revision;
+    request.pageIndex = 0;
+    request.scale = 1.0;
+    session.requestRender(request);
+    QTRY_COMPARE_WITH_TIMEOUT(rendered.size(), 1, 5000);
+    QVERIFY(!qvariant_cast<nexpdf::RenderResult>(rendered.first().first()).image.isNull());
+}
+
+void DocumentSessionTests::enforcesDocumentPermissions()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString input = writeFixture(directory.path());
+    const QString restrictedPath = directory.path() + QStringLiteral("/restricted.pdf");
+    const QString annotateOnlyPath = directory.path() + QStringLiteral("/annotate-only.pdf");
+
+    {
+        nexpdf::DocumentSession writer;
+        QSignalSpy opened(&writer, &nexpdf::DocumentSession::opened);
+        QSignalSpy saved(&writer, &nexpdf::DocumentSession::saved);
+        QSignalSpy writeFailed(&writer, &nexpdf::DocumentSession::failed);
+        writer.open(input);
+        QTRY_COMPARE_WITH_TIMEOUT(opened.size(), 1, 5000);
+
+        nexpdf::SaveOptions restricted;
+        restricted.encryption.algorithm = nexpdf::EncryptionAlgorithm::Aes128;
+        restricted.encryption.userPassword = QStringLiteral("reader-passphrase");
+        restricted.encryption.ownerPassword = QStringLiteral("owner-passphrase");
+        restricted.encryption.permissions.modify = false;
+        restricted.encryption.permissions.annotate = false;
+        restricted.encryption.permissions.assemble = false;
+        writer.saveAs(restrictedPath, restricted);
+        QTRY_VERIFY_WITH_TIMEOUT(saved.size() == 1 || !writeFailed.isEmpty(), 5000);
+        QVERIFY2(writeFailed.isEmpty(), qPrintable(errorDescription(writeFailed)));
+
+        nexpdf::SaveOptions annotateOnly;
+        annotateOnly.encryption.algorithm = nexpdf::EncryptionAlgorithm::Aes128;
+        annotateOnly.encryption.userPassword = QStringLiteral("reader-passphrase");
+        annotateOnly.encryption.ownerPassword = QStringLiteral("owner-passphrase");
+        annotateOnly.encryption.permissions.modify = false;
+        annotateOnly.encryption.permissions.annotate = true;
+        annotateOnly.encryption.permissions.assemble = false;
+        writer.saveAs(annotateOnlyPath, annotateOnly);
+        QTRY_VERIFY_WITH_TIMEOUT(saved.size() == 2 || !writeFailed.isEmpty(), 5000);
+        QVERIFY2(writeFailed.isEmpty(), qPrintable(errorDescription(writeFailed)));
+    }
+
+    nexpdf::OpenOptions credentials;
+    credentials.password = QStringLiteral("reader-passphrase");
+
+    nexpdf::DocumentSession reader;
+    QSignalSpy opened(&reader, &nexpdf::DocumentSession::opened);
+    QSignalSpy failed(&reader, &nexpdf::DocumentSession::failed);
+    reader.open(restrictedPath, credentials);
+    QTRY_COMPARE_WITH_TIMEOUT(opened.size(), 1, 5000);
+
+    nexpdf::EditOperation rotate;
+    rotate.kind = nexpdf::EditKind::RotatePage;
+    rotate.pageIndex = 0;
+    rotate.rotation = 90;
+    reader.applyEdit(rotate);
+    QTRY_COMPARE_WITH_TIMEOUT(failed.size(), 1, 5000);
+    QCOMPARE(qvariant_cast<nexpdf::OperationError>(failed.last().first()).code,
+             nexpdf::ErrorCode::PermissionDenied);
+
+    nexpdf::EditOperation highlight;
+    highlight.kind = nexpdf::EditKind::AddHighlight;
+    highlight.pageIndex = 0;
+    highlight.bounds = QRectF(20, 20, 80, 20);
+    reader.applyEdit(highlight);
+    QTRY_COMPARE_WITH_TIMEOUT(failed.size(), 2, 5000);
+    QCOMPARE(qvariant_cast<nexpdf::OperationError>(failed.last().first()).code,
+             nexpdf::ErrorCode::PermissionDenied);
+
+    nexpdf::DocumentSession annotateReader;
+    QSignalSpy annotateOpened(&annotateReader, &nexpdf::DocumentSession::opened);
+    QSignalSpy annotateState(&annotateReader, &nexpdf::DocumentSession::stateChanged);
+    QSignalSpy annotateFailed(&annotateReader, &nexpdf::DocumentSession::failed);
+    annotateReader.open(annotateOnlyPath, credentials);
+    QTRY_COMPARE_WITH_TIMEOUT(annotateOpened.size(), 1, 5000);
+
+    // Annotation-only permission permits markup...
+    nexpdf::EditOperation annotate;
+    annotate.kind = nexpdf::EditKind::AddHighlight;
+    annotate.pageIndex = 0;
+    annotate.bounds = QRectF(20, 20, 80, 20);
+    annotate.color = QColor(255, 214, 0);
+    annotate.opacity = 0.45;
+    const int stateBeforeAnnotate = annotateState.size();
+    annotateReader.applyEdit(annotate);
+    QTRY_VERIFY_WITH_TIMEOUT(annotateState.size() > stateBeforeAnnotate || !annotateFailed.isEmpty(), 5000);
+    QVERIFY2(annotateFailed.isEmpty(), qPrintable(errorDescription(annotateFailed)));
+
+    // ...but not page assembly.
+    nexpdf::EditOperation deletePage;
+    deletePage.kind = nexpdf::EditKind::DeletePage;
+    deletePage.pageIndex = 0;
+    annotateReader.applyEdit(deletePage);
+    QTRY_COMPARE_WITH_TIMEOUT(annotateFailed.size(), 1, 5000);
+    QCOMPARE(qvariant_cast<nexpdf::OperationError>(annotateFailed.last().first()).code,
+             nexpdf::ErrorCode::PermissionDenied);
+}
+
+void DocumentSessionTests::removingWatermarkAfterRedactionKeepsRedaction()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString input = writeFixture(directory.path());
+    const QString output = directory.path() + QStringLiteral("/watermark-then-redaction.pdf");
+
+    nexpdf::DocumentSession session;
+    QSignalSpy opened(&session, &nexpdf::DocumentSession::opened);
+    QSignalSpy state(&session, &nexpdf::DocumentSession::stateChanged);
+    QSignalSpy scanned(&session, &nexpdf::DocumentSession::watermarksScanned);
+    QSignalSpy searched(&session, &nexpdf::DocumentSession::searchFinished);
+    QSignalSpy failed(&session, &nexpdf::DocumentSession::failed);
+    QSignalSpy saved(&session, &nexpdf::DocumentSession::saved);
+    session.open(input);
+    QTRY_COMPARE_WITH_TIMEOUT(opened.size(), 1, 5000);
+
+    session.search(QStringLiteral("nexPDF"));
+    QTRY_COMPARE_WITH_TIMEOUT(searched.size(), 1, 5000);
+    const auto hits = qvariant_cast<QVector<nexpdf::SearchHit>>(searched.first().first());
+    QVERIFY(!hits.isEmpty());
+    QVERIFY(!hits.first().quads.isEmpty());
+
+    nexpdf::WatermarkSpec watermark;
+    watermark.text = QStringLiteral("CONFIDENTIAL");
+    const int stateBeforeWatermark = state.size();
+    session.addWatermark(watermark);
+    QTRY_VERIFY_WITH_TIMEOUT(state.size() > stateBeforeWatermark, 5000);
+
+    session.scanWatermarks();
+    QTRY_COMPARE_WITH_TIMEOUT(scanned.size(), 1, 5000);
+    const auto candidates = qvariant_cast<QVector<nexpdf::WatermarkCandidate>>(
+        scanned.first().first());
+    QCOMPARE(candidates.size(), 1);
+    const QString staleId = candidates.first().id;
+
+    nexpdf::EditOperation preview;
+    preview.kind = nexpdf::EditKind::AddRedactionPreview;
+    preview.pageIndex = 0;
+    preview.bounds = hits.first().quads.first().adjusted(-2, -2, 2, 2);
+    const int stateBeforePreview = state.size();
+    session.applyEdit(preview);
+    QTRY_VERIFY_WITH_TIMEOUT(state.size() > stateBeforePreview, 5000);
+
+    nexpdf::EditOperation apply;
+    apply.kind = nexpdf::EditKind::ApplyRedactions;
+    apply.pageIndex = 0;
+    const int stateBeforeApply = state.size();
+    session.applyEdit(apply);
+    QTRY_VERIFY_WITH_TIMEOUT(state.size() > stateBeforeApply, 5000);
+
+    // Scanned candidates are invalid after a content rewrite, so removal must be
+    // rejected instead of restoring the pre-redaction snapshot.
+    session.removeWatermarks({staleId});
+    QTRY_COMPARE_WITH_TIMEOUT(failed.size(), 1, 5000);
+    QCOMPARE(qvariant_cast<nexpdf::OperationError>(failed.first().first()).code,
+             nexpdf::ErrorCode::InvalidArgument);
+
+    session.saveAs(output);
+    QTRY_COMPARE_WITH_TIMEOUT(saved.size(), 1, 5000);
+#ifndef Q_OS_WIN
+    // New destinations are created owner-only because the temporary file may
+    // contain decrypted content.
+    const QFile::Permissions written = QFileInfo(output).permissions();
+    QVERIFY(written.testFlag(QFileDevice::ReadOwner));
+    QVERIFY(!written.testFlag(QFileDevice::ReadOther));
+#endif
+
+    nexpdf::DocumentSession verification;
+    QSignalSpy verified(&verification, &nexpdf::DocumentSession::opened);
+    QSignalSpy verificationSearch(&verification, &nexpdf::DocumentSession::searchFinished);
+    verification.open(output);
+    QTRY_COMPARE_WITH_TIMEOUT(verified.size(), 1, 5000);
+    verification.search(QStringLiteral("nexPDF"));
+    QTRY_COMPARE_WITH_TIMEOUT(verificationSearch.size(), 1, 5000);
+    QVERIFY(qvariant_cast<QVector<nexpdf::SearchHit>>(
+        verificationSearch.first().first()).isEmpty());
 }
 
 QTEST_MAIN(DocumentSessionTests)

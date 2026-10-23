@@ -63,3 +63,10 @@ endif()
 
 include(GNUInstallDirs)
 install(FILES LICENSE THIRD_PARTY_NOTICES.md DESTINATION ${CMAKE_INSTALL_DATADIR}/nexpdf)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSES/LGPL-3.0.txt")
+  install(FILES LICENSES/LGPL-3.0.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/nexpdf)
+else()
+  message(WARNING
+    "LICENSES/LGPL-3.0.txt is missing: binary packages ship LGPLv3 Qt libraries "
+    "and a compliant release must include the LGPLv3 text.")
+endif()

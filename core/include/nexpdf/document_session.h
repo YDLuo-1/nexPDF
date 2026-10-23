@@ -40,7 +40,7 @@ signals:
     void searchFinished(const QVector<nexpdf::SearchHit> &hits);
     void textExtracted(int pageIndex, const QRectF &bounds, const QString &text);
     void watermarksScanned(const QVector<nexpdf::WatermarkCandidate> &candidates);
-    void saved(const QString &path);
+    void saved(const QString &path, const QString &fingerprint);
     void stateChanged(quint64 revision, bool modified, bool canUndo, bool canRedo);
     void pageCountChanged(int pageCount);
     void progressChanged(const QString &operation, int current, int total);

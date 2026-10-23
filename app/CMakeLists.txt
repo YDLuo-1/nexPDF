@@ -23,13 +23,30 @@ qt_add_executable(nexPDF main.cpp)
 target_link_libraries(nexPDF PRIVATE nexpdf_app_ui)
 
 if(WIN32)
-  target_sources(nexPDF PRIVATE assets/nexpdf.rc)
+  # The resource template carries the file/product version, so Windows Explorer
+  # and the installer show the same version as `nexPDF --version`. Forward
+  # slashes keep the absolute icon path free of .rc escaping.
+  file(TO_CMAKE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets/nexpdf.ico" NEXPDF_ICON_PATH)
+  configure_file(assets/nexpdf.rc "${CMAKE_BINARY_DIR}/generated/nexpdf.rc" @ONLY)
+  target_sources(nexPDF PRIVATE "${CMAKE_BINARY_DIR}/generated/nexpdf.rc")
 endif()
 
 if(APPLE)
   set_source_files_properties(assets/nexpdf.icns PROPERTIES
     MACOSX_PACKAGE_LOCATION "Resources")
   target_sources(nexPDF PRIVATE assets/nexpdf.icns)
+  # A DMG built from nexPDF.app alone would otherwise ship without the project
+  # and third-party notices. The LGPL text is optional at configure time but is
+  # required for a compliant binary release.
+  set(_nexpdf_notice_files
+    "${CMAKE_SOURCE_DIR}/LICENSE"
+    "${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md")
+  if(EXISTS "${CMAKE_SOURCE_DIR}/LICENSES/LGPL-3.0.txt")
+    list(APPEND _nexpdf_notice_files "${CMAKE_SOURCE_DIR}/LICENSES/LGPL-3.0.txt")
+  endif()
+  set_source_files_properties(${_nexpdf_notice_files} PROPERTIES
+    MACOSX_PACKAGE_LOCATION "Resources")
+  target_sources(nexPDF PRIVATE ${_nexpdf_notice_files})
 endif()
 
 if(MSVC)

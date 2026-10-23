@@ -8,10 +8,11 @@ A tag is not a formal release until every required item is checked with attached
 - Windows UI acceptance (high-DPI sharpness, search highlight, drag placement, reading position, damaged xref, AES-256 unlock, layers, transparency, large image, bilingual UI): agent-driven with screenshots, 2026-09-28. / Windows 界面验收由电脑控制完成并留存截图。
 - Measured performance: render P50 2.6 ms / P95 4.1 ms, throughput 330 pages/s, peak RSS 24 MiB; 50-cycle stability +0.6 MiB after warmup (100-page corpus, 1.5 density, 5000 pages, zero errors). / 性能与内存稳定性实测数据如左。
 - Package assets, digests, bilingual notes, and the AGPL source archive: verified on rc.7–rc.10. / 发布资产、摘要、双语说明与 AGPL 源码包在 rc.7–rc.10 实测验证。
-- Still open for formal v1.0.0: clean-VM smoke (setup.exe on a pristine machine), Linux AppImage and macOS DMG spot checks on real systems, dedicated embedded-font corpus, and a measured print path once printing ships. / 正式 v1.0.0 前仍待完成：干净虚拟机冒烟、Linux/macOS 实机抽查、嵌入式字体专用语料，以及未来打印功能的实测。
+- Still open for formal v1.0.0: clean-VM smoke (setup.exe on a pristine machine), macOS DMG spot checks on real hardware, dedicated embedded-font corpus, and a measured print path once printing ships. Linux is covered: the rc.11 AppImage passed `--version` and a WSLg GUI check with CJK rendering on real Ubuntu 24.04 (2026-09-28, screenshot `out/linux-wslg-gui.png` locally). / 正式 v1.0.0 前仍待完成：干净虚拟机冒烟、macOS 实机抽查、嵌入式字体专用语料，以及未来打印功能的实测。Linux 已覆盖：rc.11 AppImage 在真实 Ubuntu 24.04 上通过 `--version` 与 WSLg 中文渲染检查（2026-09-28）。
+- rc.12 code changes (watermark/redaction ordering, open-failure isolation, per-operation permissions, safe-save durability, annotation colours) are covered by new regression tests but have not been executed on the maintainer machine; CI must confirm them before tagging. / rc.12 的代码改动（水印/涂黑顺序、打开失败隔离、按操作权限、保存耐久性、批注颜色）已有回归用例，但尚未在维护者机器上执行，打标签前必须由 CI 确认。
 
 - [ ] Exact Qt 6.11.2 and MuPDF 1.28.2 production build on Windows x64, Linux x86_64, and macOS Universal.
-- [ ] Unit/integration tests, qpdf `--check`, Poppler reference rendering, and clean-machine smoke tests pass.
+- [ ] Unit/integration tests, qpdf `--warning-exit-0 --check`, Poppler reference rendering, and clean-machine smoke tests pass.
 - [ ] AES-128/AES-256, legacy RC4 read, Unicode passwords, empty-password rejection, wrong passwords, permissions, and decryption corpus pass.
 - [ ] Page operations, annotations, redaction, journal undo/redo, disk failure/cancel safety, and signature Save As gate pass.
 - [ ] nexPDF watermark add/remove render equivalence and external candidate false-positive corpus pass.
@@ -19,6 +20,7 @@ A tag is not a formal release until every required item is checked with attached
 - [ ] Measured P50/P95, throughput, peak RSS, error count, 50-cycle memory stability, mutool ratios, and package-size report are published.
 - [ ] High-DPI, Chinese IME, theme, scrollbar, focus/accessibility, and three-platform screenshots are reviewed.
 - [ ] Portable ZIP, unsigned setup.exe, AppImage, Universal DMG, full source, and bilingual notes exist; GitHub asset digests are visible for integrity checks.
+- [ ] `LICENSES/LGPL-3.0.txt` exists and is shipped in every binary package (`share/nexpdf` or `nexPDF.app/Contents/Resources`); stable tags are published only through a manual `workflow_dispatch`.
 - [ ] Source archive contains MuPDF and all nested dependency source required by AGPL corresponding-source obligations.
 - [ ] A clean VM runs `--version`, open, render, edit, save, reopen; unsigned-package warnings are visible in notes.
 

@@ -12,7 +12,7 @@ nexPDF 是一个本地运行、跨平台的 PDF 查看与实用编辑工具，�
 
 ### 功能
 
-- 查看：拖放和命令行打开、密码输入、连续滚动、页码导航、缩放、旋转和文本搜索；按内容指纹记住每个文档的阅读位置（不保存文件路径），并提供护眼模式页面染色。
+- 查看：拖放和命令行打开、密码输入、连续滚动、页码导航、缩放、页面旋转和文本搜索；按内容指纹记住每个文档的阅读位置（不保存文件路径），并提供护眼模式页面染色。
 - 加密：AES-256（默认）和 AES-128 兼容模式；加密输出要求非空用户/所有者密码，并可配置 PDF 权限。
 - 解密：仅使用正确密码创建无加密副本；不包含破解、爆破或权限绕过功能。
 - 编辑：空白页、删除、排序、旋转、导入页面；添加、移动、缩放、删除工具创建的文字和图片；高亮、下划线、删除线、自由文本、图形、手绘批注。
@@ -26,7 +26,7 @@ PDF 权限主要依赖阅读器遵守，不能替代真正的数据访问控制�
 
 ### 安装
 
-Windows 便携包从 [Releases](https://github.com/YDLuo-1/nexPDF/releases) 直接下载；winget 清单见 [`packaging/winget`](packaging/winget)（已通过本地验证，正在提交 winget-pkgs），Scoop 清单见 [`packaging/scoop`](packaging/scoop)，可复制进自己的 bucket 使用。
+Windows 便携包从 [Releases](https://github.com/YDLuo-1/nexPDF/releases) 直接下载；winget 清单模板见 [`packaging/winget`](packaging/winget)（每次发布后需按当前资产哈希更新再提交 winget-pkgs），Scoop 清单模板见 [`packaging/scoop`](packaging/scoop)，可复制进自己的 bucket 使用。
 
 ### 与同类工具对比
 
@@ -84,6 +84,7 @@ Linux/macOS 以及打包步骤见 [构建说明](docs/building.md)。架构与�
 - 本地 8 组核心功能用例已覆盖打开、渲染、搜索、选区取文、Unicode 密码 AES-256 加密/解密、空用户/所有者密码拒绝、相同密码 AES-128 与权限、页面插入/旋转、文字/图片/墨迹/高亮批注、两阶段永久涂黑、对象两阶段调整、撤销/重做、跨 display-list LRU 淘汰的多页渲染、标准 Watermark 批注的候选确认移除，以及 nexPDF 水印添加、扫描、精确移除和渲染等价；Qt Test 总计 10 项（含初始化/清理）全部通过。
 - 独立 UI 冒烟在 Windows 11、150% DPI 下实例化真实主窗口、打开 PDF、等待主画布瓦片完成，检查混合图标/文字按钮和 Tooltip，并在同一用例中生成中英文截图；Qt Test 3 项（含初始化/清理）通过。
 - qpdf 12.4.0 已完成 9 项独立结构/加密检查，确认 AES-256 使用 R=6/AESv3、AES-128 使用 R=4/AESv2 且权限限制生效；Poppler 26.02.0 成功渲染加密、编辑、涂黑和去水印关键页。最终用户包不含测试基准程序或 `Qt6Test.dll`。
+- rc.12 新增"打开失败不破坏当前文档""按操作类型校验 PDF 权限""水印后涂黑不可回滚"三组回归用例；本节统计待 CI 运行后更新。
 - 上述证据仅是 Windows 本地验证，不代表发布检查表已经完成。Qt 6.11.2 三平台构建、复杂语料、完整编辑矩阵、真实 100/300/1000 页性能对比、干净虚拟机和界面截图仍须由 Release CI/人工验收完成。
 
 ### 许可与免责声明
@@ -104,7 +105,7 @@ nexPDF is a local, cross-platform PDF viewer and practical editor built with C++
 
 ### Features
 
-- Viewing: drag-and-drop and command-line opening, password prompt, continuous scrolling, page navigation, zoom, rotation, and text search; remembers each document's last reading position by content fingerprint (no file paths stored) and offers an eye-care page tint.
+- Viewing: drag-and-drop and command-line opening, password prompt, continuous scrolling, page navigation, zoom, page rotation, and text search; remembers each document's last reading position by content fingerprint (no file paths stored) and offers an eye-care page tint.
 - Encryption: AES-256 by default, with AES-128 compatibility mode; encrypted output requires non-empty user/owner passwords and supports PDF permission flags.
 - Decryption: creates an unencrypted copy only with a correct password; no cracking, brute force, or permission bypass.
 - Editing: insert blank pages, delete, reorder, rotate, and import pages; add, move, resize, and remove tool-created text/images; highlights, underlines, strikeouts, free text, shapes, and ink annotations.
@@ -118,7 +119,7 @@ PDF permissions depend mainly on reader cooperation and are not a substitute for
 
 ### Install
 
-Grab the Windows portable ZIP from [Releases](https://github.com/YDLuo-1/nexPDF/releases); winget manifests live in [`packaging/winget`](packaging/winget) (validated locally, winget-pkgs submission in progress) and the Scoop manifest in [`packaging/scoop`](packaging/scoop) can be copied into your own bucket.
+Grab the Windows portable ZIP from [Releases](https://github.com/YDLuo-1/nexPDF/releases); winget manifest templates live in [`packaging/winget`](packaging/winget) (update them to the current asset hash before submitting to winget-pkgs) and the Scoop template in [`packaging/scoop`](packaging/scoop) can be copied into your own bucket.
 
 ### How it compares
 
@@ -176,6 +177,7 @@ See [build documentation](docs/building.md) for Linux/macOS and packaging, [arch
 - Eight local core test groups cover open/render/search/selection, AES-256 encryption and decryption with a Unicode password, rejection of empty user/owner passwords, AES-128 with matching credentials and restricted permissions, page insertion/rotation, text/image/ink/highlight annotations, two-stage permanent redaction, two-stage object adjustment, undo/redo, multi-page rendering across display-list LRU eviction, confirmed removal of a standard Watermark annotation, and nexPDF watermark add/scan/exact removal/render equivalence. Qt Test reports ten passing items including initialization and cleanup.
 - A separate Windows 11 UI smoke at 150% DPI instantiates the real main window, opens a PDF, waits for the main canvas tile, checks hybrid icon/text buttons and tooltips, and captures both English and Chinese layouts in one case. Its three Qt Test items, including initialization and cleanup, pass.
 - qpdf 12.4.0 completed nine independent structure/encryption checks, reporting R=6/AESv3 for AES-256 and R=4/AESv2 with effective permission restrictions for AES-128. Poppler 26.02.0 rendered encrypted, edited, redacted, and watermark-restored key pages. The end-user package contains neither the benchmark executable nor `Qt6Test.dll`.
+- rc.12 adds regression cases for "a failed open keeps the current document", per-operation PDF permission checks, and "removing a watermark after redaction cannot roll the redaction back"; the counts above will be refreshed after a CI run.
 - This is Windows-local evidence, not completion of the release checklist. Exact-Qt three-platform builds, complex corpora, the complete editing matrix, real 100/300/1000-page performance comparisons, clean-VM checks, and UI screenshots still require Release CI and human acceptance.
 
 ### License and disclaimer

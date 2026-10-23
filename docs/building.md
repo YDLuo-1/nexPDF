@@ -4,11 +4,11 @@
 
 - CMake 3.25+
 - C++20 compiler: MSVC 19.3+, GCC 13+, or Apple Clang 16+
-- Qt 6.11.2 exactly: Core, Gui, Widgets, Test
+- Qt 6.11.2 exactly: Core, Gui, Widgets, Test (plus the Svg runtime plugin that `windeployqt` ships)
 - MuPDF 1.28.2 at commit `fe374accd98a43174a328fa7980d7675e06d5b0d`
 - qpdf and Poppler are validation tools only, not runtime engines
 
-正式构建使用上述精确版本。开发者可以通过 `-DNEXPDF_QT_VERSION=<compatible-version>` 做非发布编译检查，但这样的产物不得作为正式 Release。
+正式构建使用上述精确版本。`find_package(Qt6 ... EXACT)` 要求安装版本与 `NEXPDF_QT_VERSION` 完全一致；开发者可以把它改成机器上实际安装的精确版本做非发布编译检查，但这样的产物不得作为正式 Release。
 
 ## MuPDF prefix / MuPDF 前缀
 
@@ -49,11 +49,11 @@ For macOS Universal, also set `-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64` and provi
 Release jobs must run:
 
 ```bash
-qpdf --check output.pdf
+qpdf --warning-exit-0 --check output.pdf
 pdftoppm -png -f 1 -singlefile output.pdf output-page-1
 ```
 
-MuPDF reopen validation is mandatory but not independent, so it cannot replace qpdf/Poppler checks. Passwords must be supplied through protected CI secrets or interactive test harnesses, never command output.
+`--warning-exit-0` keeps qpdf's warnings in the log while only real structural errors fail the build; different qpdf versions disagree about warnings on MuPDF output. MuPDF reopen validation is mandatory but not independent, so it cannot replace qpdf/Poppler checks. Passwords must be supplied through protected CI secrets or interactive test harnesses, never command output.
 
 ## Packaging / 打包
 

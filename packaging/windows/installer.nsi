@@ -20,6 +20,16 @@ Unicode true
 Name "nexPDF ${VERSION}"
 OutFile "${OUTPUT_FILE}"
 Icon "${ICON_FILE}"
+
+!ifdef VI_VERSION
+  VIProductVersion "${VI_VERSION}"
+  VIAddVersionKey "ProductName" "nexPDF"
+  VIAddVersionKey "ProductVersion" "${VERSION}"
+  VIAddVersionKey "FileVersion" "${VERSION}"
+  VIAddVersionKey "FileDescription" "nexPDF installer"
+  VIAddVersionKey "LegalCopyright" "AGPL-3.0-or-later"
+!endif
+
 InstallDir "$LOCALAPPDATA\nexPDF"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma

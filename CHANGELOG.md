@@ -4,6 +4,30 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0-rc.12] - 2026-10-24
+
+### Fixed / 修复
+
+- Removing a nexPDF watermark can no longer restore a page snapshot recorded before a redaction: any content change invalidates scanned candidates, and applying redactions drops the snapshot. / 移除 nexPDF 水印不再可能恢复涂黑前的页面快照：任何内容变更都会使已扫描候选失效，应用涂黑时会删除该快照。
+- A failed or cancelled open (missing file, malformed PDF, wrong or cancelled password) keeps the previously open document usable instead of leaving an empty session behind a stale window. / 打开失败或取消密码时保留原文档，不再出现"界面显示旧文档、会话已空"的脱节状态。
+- Highlights render as translucent yellow and underline/strikeout as red instead of an opaque black block. / 高亮改为半透明黄色，下划线与删除线改为红色，不再是不透明黑块。
+- A signed document can be saved again to the copy written by Save As; the signature flag is cleared once a fresh file is written. / 已签名文档另存后可以继续保存到该副本；写入新文件后清除签名标记。
+- PDF permissions are checked per operation: page assembly/redaction need *modify*, annotations need *annotate*. / PDF 权限按操作校验：页面编排/涂黑需要 modify，批注需要 annotate。
+- Windows EXE and setup.exe now carry file/product version resources. / Windows EXE 与安装包补齐文件/产品版本资源。
+- Text search now runs in interleaved slices on the document thread: a new search, an edit, or closing the document abandons the previous run at the next slice boundary, so thousand-page searches can no longer starve queued operations. / 文本搜索改为在文档线程上分片交错执行：新搜索、编辑或关闭文档都会在下个分片边界作废旧搜索，千页搜索不再阻塞排队操作。
+- The rc.11 Linux AppImage passed `--version` and a WSLg CJK GUI check on real Ubuntu 24.04, closing the Linux spot-check gate. / rc.11 Linux AppImage 在真实 Ubuntu 24.04 上通过 `--version` 与 WSLg 中文界面检查，Linux 抽查门槛已关闭。
+- macOS DMG now ships `LICENSE` and `THIRD_PARTY_NOTICES.md` inside the bundle. / macOS DMG 的应用包内现在包含许可证与第三方声明。
+
+### Changed / 变更
+
+- Save writes a `0600` temporary file on POSIX, restores the destination mode, fsyncs the file, and fsyncs the directory after the rename. / 保存在 POSIX 上以 `0600` 创建临时文件、恢复目标权限、fsync 文件并在替换后 fsync 目录。
+- Open/save parameters use a `SecurePassword` type with a deep copy and zeroization on destruction. / 打开/保存参数改用独占深拷贝并在析构时清零的 `SecurePassword`。
+- `saved` now reports the written file's content fingerprint so the UI updates its reading-position key and title after Save As. / `saved` 现在携带新文件指纹，另存后界面会更新阅读位置键与标题。
+- Documents actions are disabled until a document is open, page-count labels stay in sync, the canvas viewport uses the dark page background, and the HighDPI rounding policy is set before QApplication exists. / 未打开文档时禁用文档动作、页数标签保持同步、画布视口使用深色页面底色，并在 QApplication 创建前设置 HighDPI 取整策略。
+- The translation-coverage check now covers `core/src/document_session.cpp` and runs in CI. / 翻译覆盖检查纳入 `core/src/document_session.cpp` 并在 CI 中运行。
+- Stable tags no longer publish automatically; they require a manual `workflow_dispatch` after the release checklist. / 正式版标签不再自动发布，需在检查表完成后手动触发。
+- Documentation: page rotation wording, qpdf flags, and the deployed Qt component inventory were corrected. / 文档修正：页面旋转措辞、qpdf 参数与部署的 Qt 组件清单。
+
 ## [1.0.0-rc.11] - 2026-09-28
 
 ### Added / 新增

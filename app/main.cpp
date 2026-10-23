@@ -23,11 +23,13 @@ int main(int argc, char *argv[])
         }
     }
 
+    // The rounding policy only takes effect before QApplication is constructed.
+    QApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+
     QApplication application(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("nexPDF"));
     QCoreApplication::setApplicationVersion(QString::fromLatin1(NEXPDF_VERSION));
     QCoreApplication::setOrganizationName(QStringLiteral("nexPDF"));
-    QApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
     QApplication::setWindowIcon(nexpdf::icons::applicationIcon());
 
     QCommandLineParser parser;

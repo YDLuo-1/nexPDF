@@ -4,6 +4,7 @@
 #include "nexpdf/document_session.h"
 
 #include <QHash>
+#include <QList>
 #include <QMainWindow>
 #include <QSet>
 
@@ -62,6 +63,8 @@ private:
     void saveReadingPosition();
     void restoreReadingPosition();
     void setEyeCareEnabled(bool enabled);
+    void setDocumentActionsEnabled(bool enabled);
+    void updatePageActions();
 
     nexpdf::DocumentSession session_;
     AppTranslator chineseTranslator_;
@@ -133,6 +136,7 @@ private:
     QAction *englishAction_ = nullptr;
     QAction *chineseAction_ = nullptr;
     QAction *aboutAction_ = nullptr;
+    QList<QAction *> documentActions_;
 
     QString currentPath_;
     int pageCount_ = 0;

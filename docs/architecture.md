@@ -5,8 +5,8 @@
 1. `DocumentSession` is the only public document façade. There is no speculative engine interface or plugin ABI in v1. / `DocumentSession` 是唯一文档门面，v1 不建立预留的引擎接口或插件 ABI。
 2. A document is opened, parsed, searched, modified, journaled, and saved only on its document thread. UI code never calls MuPDF directly. / 打开、解析、搜索、修改、journal 和保存仅发生在文档线程，UI 不直接调用 MuPDF。
 3. Cache identity contains document revision, page, scale bucket, rotation, render density (device pixel ratio), and tile coordinates. Editing increments the revision, making stale render results unusable. / 缓存键包含 revision、页码、缩放档、旋转、渲染密度（设备像素比）和瓦片坐标；编辑递增 revision，旧渲染结果自动失效。
-4. The default byte-budgeted cache total is 256 MiB: a 64 MiB MuPDF store plus a 192 MiB tile LRU, configurable to a 64–1024 MiB total. Display lists are separately capped to the eight most recently used pages because MuPDF does not expose their byte cost. / 默认按字节计费的缓存总额为 256 MiB：64 MiB MuPDF store 加 192 MiB 瓦片 LRU，总额可设置为 64–1024 MiB。MuPDF 不提供 display list 字节成本，因此另按最近使用的 8 页设硬上限。
-5. Passwords never enter log messages, progress text, exceptions, recent-file metadata, or crash annotations. Temporary UTF-8 buffers, MuPDF write buffers, and the document-session password cache are overwritten when released. / 密码不得进入日志、进度文本、异常、最近文件元数据或崩溃注释；临时 UTF-8 缓冲区、MuPDF 写入缓冲区和文档会话密码缓存在释放时覆盖清理。
+4. The default byte-budgeted cache total is 256 MiB: a 64 MiB MuPDF store plus a 192 MiB tile LRU. `PdfCanvas::setCacheLimitMiB` accepts a 64–1024 MiB total, but the UI does not expose a setting yet. Display lists are separately capped to the eight most recently used pages because MuPDF does not expose their byte cost. / 默认按字节计费的缓存总额为 256 MiB：64 MiB MuPDF store 加 192 MiB 瓦片 LRU。`PdfCanvas::setCacheLimitMiB` 接受 64–1024 MiB 总额，但界面尚未提供设置入口。MuPDF 不提供 display list 字节成本，因此另按最近使用的 8 页设硬上限。
+5. Passwords never enter log messages, progress text, exceptions, recent-file metadata, or crash annotations. Save/open parameters use `SecurePassword` (deep copy, zeroized on destruction); temporary UTF-8 buffers, MuPDF write buffers, and the document-session password cache are overwritten when released. Copies owned by Qt widgets, allocators, and the operating system are outside this guarantee. / 密码不得进入日志、进度文本、异常、最近文件元数据或崩溃注释；保存/打开参数使用 `SecurePassword`（深拷贝、析构清零），临时 UTF-8 缓冲区、MuPDF 写入缓冲区和文档会话密码缓存在释放时覆盖清理。Qt 控件、分配器与操作系统持有的副本不在保证范围内。
 6. Existing signed PDFs are never overwritten after modification. / 修改后的已签名 PDF 永不覆盖原文件。
 7. A destination becomes visible only after the temporary PDF can be reopened and its first/last pages loaded. / 临时 PDF 能重新打开并加载首尾页后，才允许替换目标。
 
@@ -46,14 +46,16 @@ Tool-created watermarks use one reusable Form XObject, an opacity ExtGState, and
 ## Save transaction / 保存事务
 
 ```text
-write sibling temporary file
-  → flush and close
+write sibling temporary file (owner-only on POSIX)
+  → apply destination permissions
+  → flush, fsync, and close
   → reopen with expected password
   → count pages and load first/last
   → atomic replace (MoveFileExW or POSIX rename)
+  → fsync the directory (POSIX)
   → report saved
 ```
 
-Overwrite requires an explicit UI confirmation. A crash or cancellation before the replace leaves the original target intact. The sibling temporary path is a UUID name opened with `QIODevice::NewOnly`; a scope guard removes it unless validation and replacement both succeed.
+Overwrite requires an explicit UI confirmation. A crash or cancellation before the replace leaves the original target intact. The sibling temporary path is a UUID name opened with `QIODevice::NewOnly`; a scope guard removes it unless validation and replacement both succeed. On POSIX the temporary file starts as `0600` and inherits the destination's mode before the rename, so a decrypted edit is never world-readable.
 
-覆盖已有文件必须由界面二次确认。替换发生前崩溃或取消不会破坏原目标。临时文件使用目标目录中的 UUID 文件名并以 `QIODevice::NewOnly` 打开；只有校验和替换都成功时才解除作用域清理。
+覆盖已有文件必须由界面二次确认。替换发生前崩溃或取消不会破坏原目标。临时文件使用目标目录中的 UUID 文件名并以 `QIODevice::NewOnly` 打开；只有校验和替换都成功时才解除作用域清理。POSIX 上临时文件以 `0600` 创建，并在替换前恢复目标文件原有权限，避免解密后的内容被同机其他用户读取。

@@ -11,9 +11,14 @@ MuPDF embeds or links additional third-party codec, font, shaping, color, compre
 ## Qt 6.11.2
 
 - Source: https://code.qt.io/
-- Components used: Qt Core, Gui, Widgets, Test
-- Qt is available under LGPLv3/GPLv2/GPLv3 and commercial licensing terms. nexPDF's AGPL distribution must retain the applicable Qt notices and permit user relinking where the LGPL terms require it.
+- Components used: Qt Core, Gui, Widgets, Svg (pulled in by the deployed `qsvg` plugin), plus the platform/style/image-format/icon-engine plugins copied by `windeployqt`.
+- Qt is available under LGPLv3/GPLv2/GPLv3 and commercial licensing terms. nexPDF's AGPL distribution must retain the applicable Qt notices, ship the LGPLv3 text, and permit user relinking where the LGPL terms require it. The unmodified Qt libraries are shipped next to the executable, so relinking remains possible.
+- The LGPLv3 text belongs at `LICENSES/LGPL-3.0.txt`; see [`LICENSES/README.md`](LICENSES/README.md).
 - WebEngine is not used.
+
+## Mesa software OpenGL / Mesa 软件 OpenGL
+
+Windows packages produced by `windeployqt` include `opengl32sw.dll`, the Mesa 3D software rasterizer used as a fallback when no usable GPU driver is present. Mesa is distributed under MIT-style licenses; its copyright and license text must remain available with the binary package.
 
 ## Fonts / 字体
 

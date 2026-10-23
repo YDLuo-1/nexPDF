@@ -36,6 +36,8 @@
 #  include <windows.h>
 #else
 #  include <cerrno>
+#  include <fcntl.h>
+#  include <unistd.h>
 #endif
 
 namespace nexpdf {
@@ -263,6 +265,58 @@ bool replaceAtomically(const QString &temporaryPath, const QString &targetPath, 
 #endif
 }
 
+#ifndef Q_OS_WIN
+bool flushFileToDisk(QFile &file)
+{
+    const int descriptor = file.handle();
+    if (descriptor < 0) {
+        return false;
+    }
+    int result = 0;
+    do {
+        result = ::fsync(descriptor);
+    } while (result != 0 && errno == EINTR);
+    return result == 0;
+}
+
+void syncDirectory(const QString &directoryPath)
+{
+    const QByteArray path = QFile::encodeName(directoryPath);
+    const int descriptor = ::open(path.constData(), O_RDONLY | O_DIRECTORY);
+    if (descriptor < 0) {
+        return;
+    }
+    (void)::fsync(descriptor);
+    ::close(descriptor);
+}
+#endif
+
+void dropWatermarkSnapshot(fz_context *context, pdf_obj *pageObject)
+{
+    pdf_dict_dels(context, pageObject, "nexPDFOriginalResources");
+    pdf_dict_dels(context, pageObject, "nexPDFOriginalContents");
+    pdf_dict_dels(context, pageObject, "nexPDFOriginalPageStateStored");
+}
+
+// Page assembly needs PDF "assemble", content rewrites need "modify", and
+// annotations need "annotate". Treating them as interchangeable would let an
+// annotate-only document delete pages.
+bool hasEditPermission(fz_context *context, fz_document *document, const EditKind kind)
+{
+    switch (kind) {
+    case EditKind::ImportPages:
+    case EditKind::InsertBlankPage:
+    case EditKind::DeletePage:
+    case EditKind::MovePage:
+        return fz_has_permission(context, document, FZ_PERMISSION_ASSEMBLE) != 0;
+    case EditKind::RotatePage:
+    case EditKind::ApplyRedactions:
+        return fz_has_permission(context, document, FZ_PERMISSION_EDIT) != 0;
+    default:
+        return fz_has_permission(context, document, FZ_PERMISSION_ANNOTATE) != 0;
+    }
+}
+
 struct QtOutputState {
     QIODevice *device = nullptr;
 };
@@ -453,7 +507,6 @@ public:
             return;
         }
 
-        closeDocument(false);
         fz_context *context = runtime_->context();
         fz_document *candidate = nullptr;
         bool needsPassword = false;
@@ -511,12 +564,18 @@ public:
             return;
         }
 
+        // The candidate is fully opened, authenticated, and inspected before the
+        // current document is replaced. A failed or cancelled open therefore
+        // leaves the previously open document usable.
+        const QString fingerprint = computeFileFingerprint(file.absoluteFilePath());
+        closeDocument(false);
         document_ = candidate;
         pdf_ = pdf_specifics(context, document_);
         path_ = file.absoluteFilePath();
         encrypted_ = encryptedDocument;
         password_ = password;
         signedDocument_ = signedDocument;
+        signedSourcePath_ = signedDocument ? path_ : QString();
         pageCount_ = pageCount;
         modified_ = false;
         ++revision_;
@@ -531,13 +590,15 @@ public:
         info.encrypted = encrypted_;
         info.signedDocument = signedDocument_;
         info.revision = revision_;
-        info.fingerprint = computeFileFingerprint(path_);
+        info.fingerprint = fingerprint;
         post([info](DocumentSession *owner) { emit owner->opened(info); });
         emitState();
     }
 
     void closeDocument(const bool notify = true)
     {
+        ++searchGeneration_;
+        activeSearch_.reset();
         renderPool_.clear();
         renderPool_.waitForDone();
         dropDisplayLists();
@@ -551,6 +612,7 @@ public:
         pageCount_ = 0;
         encrypted_ = false;
         signedDocument_ = false;
+        signedSourcePath_.clear();
         modified_ = false;
         candidates_.clear();
         if (notify) {
@@ -636,22 +698,53 @@ public:
                                                     request, revision_), request.priority);
     }
 
+    // Search runs in slices posted back to the worker event loop so queued
+    // edits and new searches interleave with it; bumping searchGeneration_
+    // abandons the active run at the next slice boundary.
+    struct SearchRun {
+        quint64 generation = 0;
+        QByteArray utf8;
+        QVector<SearchHit> results;
+        int nextPage = 0;
+        bool failed = false;
+        QString detail;
+    };
+    std::optional<SearchRun> activeSearch_;
+    quint64 searchGeneration_ = 0;
+    static constexpr int kSearchSlicePages = 16;
+
     void search(const QString &needle)
     {
         if (!requireDocument(QStringLiteral("search"))) {
             return;
         }
         if (needle.trimmed().isEmpty()) {
+            ++searchGeneration_;
+            activeSearch_.reset();
             post([](DocumentSession *owner) { emit owner->searchFinished({}); });
             return;
         }
+        SearchRun run;
+        run.generation = ++searchGeneration_;
+        run.utf8 = needle.toUtf8();
+        activeSearch_ = std::move(run);
+        continueSearch();
+    }
 
-        QVector<SearchHit> results;
-        const QByteArray utf8 = needle.toUtf8();
+    void continueSearch()
+    {
+        if (!activeSearch_.has_value()) {
+            return;
+        }
+        SearchRun &run = *activeSearch_;
+        if (run.generation != searchGeneration_) {
+            activeSearch_.reset();
+            return;
+        }
         fz_context *context = runtime_->context();
-        bool failedSearch = false;
-        QString detail;
-        for (int pageIndex = 0; pageIndex < pageCount_ && !failedSearch; ++pageIndex) {
+        const int sliceEnd = std::min(run.nextPage + kSearchSlicePages, pageCount_);
+        while (run.nextPage < sliceEnd && !run.failed) {
+            const int pageIndex = run.nextPage;
             fz_page *page = nullptr;
             std::array<fz_quad, 256> hits{};
             std::array<int, 256> marks{};
@@ -662,33 +755,43 @@ public:
             fz_var(count);
             fz_try(context) {
                 page = fz_load_page(context, document_, pageIndex);
-                count = fz_search_page(context, page, utf8.constData(), marks.data(),
+                count = fz_search_page(context, page, run.utf8.constData(), marks.data(),
                                        hits.data(), static_cast<int>(hits.size()));
             }
             fz_always(context) { fz_drop_page(context, page); }
             fz_catch(context) {
-                failedSearch = true;
-                detail = engineMessage(context);
+                run.failed = true;
+                run.detail = engineMessage(context);
+                break;
             }
             for (int i = 0; i < count; ++i) {
                 const fz_quad &quad = hits[static_cast<std::size_t>(i)];
                 SearchHit hit;
                 hit.pageIndex = pageIndex;
-                hit.preview = needle;
+                hit.preview = QString::fromUtf8(run.utf8);
                 hit.quads.append(QRectF(QPointF(quad.ul.x, quad.ul.y),
                                         QPointF(quad.lr.x, quad.lr.y)).normalized());
-                results.append(std::move(hit));
+                run.results.append(std::move(hit));
             }
+            ++run.nextPage;
             post([pageIndex, total = pageCount_](DocumentSession *owner) {
                 emit owner->progressChanged(QStringLiteral("search"), pageIndex + 1, total);
             });
         }
-        if (failedSearch) {
+        if (run.failed) {
+            const QString detail = run.detail;
+            activeSearch_.reset();
             fail(ErrorCode::EngineError, QStringLiteral("search"),
                  tr("Text search failed."), detail);
             return;
         }
-        post([results](DocumentSession *owner) { emit owner->searchFinished(results); });
+        if (run.nextPage >= pageCount_) {
+            const QVector<SearchHit> results = std::move(run.results);
+            activeSearch_.reset();
+            post([results](DocumentSession *owner) { emit owner->searchFinished(results); });
+            return;
+        }
+        QMetaObject::invokeMethod(owner_, [this] { continueSearch(); }, Qt::QueuedConnection);
     }
 
     void extractText(const int pageIndex, const QRectF &bounds)
@@ -751,6 +854,7 @@ public:
 
     void edit(const EditOperation &operation)
     {
+        ++searchGeneration_;
         if (!requirePdf(QStringLiteral("edit"))) {
             return;
         }
@@ -762,8 +866,7 @@ public:
                  tr("The selected page does not exist."));
             return;
         }
-        if (!fz_has_permission(runtime_->context(), document_, FZ_PERMISSION_EDIT)
-            && !fz_has_permission(runtime_->context(), document_, FZ_PERMISSION_ANNOTATE)) {
+        if (!hasEditPermission(runtime_->context(), document_, operation.kind)) {
             fail(ErrorCode::PermissionDenied, QStringLiteral("edit"),
                  tr("This document does not grant editing permission."));
             return;
@@ -785,7 +888,8 @@ public:
         const QByteArray text = operation.text.toUtf8();
         const QByteArray imagePath = QDir::toNativeSeparators(operation.imagePath).toUtf8();
         const QByteArray sourcePath = QDir::toNativeSeparators(operation.sourcePath).toUtf8();
-        const QByteArray sourcePassword = operation.sourcePassword.toUtf8();
+        QByteArray sourcePassword = operation.sourcePassword.toUtf8();
+        auto clearSourcePassword = qScopeGuard([&sourcePassword] { secureClear(sourcePassword); });
         const QByteArray objectId = operation.objectId.isEmpty()
             ? QByteArrayLiteral("nexPDF:object:") + QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()
             : operation.objectId.toUtf8();
@@ -895,6 +999,7 @@ public:
             case EditKind::ApplyRedactions: {
                 page = pdf_load_page(context, pdf_, operation.pageIndex);
                 pdf_annot *annot = pdf_first_annot(context, page);
+                bool applied = false;
                 while (annot != nullptr) {
                     pdf_annot *next = pdf_next_annot(context, annot);
                     if (pdf_annot_type(context, annot) == PDF_ANNOT_REDACT) {
@@ -904,8 +1009,15 @@ public:
                         redaction.line_art = PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED;
                         redaction.text = PDF_REDACT_TEXT_REMOVE;
                         (void)pdf_apply_redaction(context, annot, &redaction);
+                        applied = true;
                     }
                     annot = next;
+                }
+                if (applied) {
+                    // A redaction rewrites the page content streams. Restoring a
+                    // watermark snapshot recorded before it would resurrect the
+                    // redacted text, so the snapshot is no longer exact.
+                    dropWatermarkSnapshot(context, pdf_lookup_page_obj(context, pdf_, operation.pageIndex));
                 }
                 break;
             }
@@ -1024,6 +1136,11 @@ public:
     void addWatermark(const WatermarkSpec &spec)
     {
         if (!requirePdf(QStringLiteral("add-watermark"))) {
+            return;
+        }
+        if (!fz_has_permission(runtime_->context(), document_, FZ_PERMISSION_EDIT)) {
+            fail(ErrorCode::PermissionDenied, QStringLiteral("add-watermark"),
+                 tr("This document does not grant editing permission."));
             return;
         }
         if (spec.kind == WatermarkKind::Text && spec.text.trimmed().isEmpty()) {
@@ -1424,7 +1541,9 @@ public:
                                                         : WatermarkRemovalSafety::ReviewRequired;
                         record.publicValue.createdByNexPDF = ours;
                         record.annotationName = name;
+                        record.annotationSubject = subject;
                         record.annotationIndex = annotationIndex;
+                        record.annotationType = type;
                         record.publicValue.bounds = toQRect(pdf_bound_annot(context, annot));
                         candidates_.append(std::move(record));
                         existing = std::prev(candidates_.end());
@@ -1540,6 +1659,11 @@ public:
     void removeWatermarks(const QStringList &ids)
     {
         if (!requirePdf(QStringLiteral("remove-watermarks"))) {
+            return;
+        }
+        if (!fz_has_permission(runtime_->context(), document_, FZ_PERMISSION_EDIT)) {
+            fail(ErrorCode::PermissionDenied, QStringLiteral("remove-watermarks"),
+                 tr("This document does not grant editing permission."));
             return;
         }
         if (ids.isEmpty()) {
@@ -1675,9 +1799,19 @@ public:
                     for (pdf_annot *annot = pdf_first_annot(context, page); annot != nullptr;
                          annot = pdf_next_annot(context, annot), ++index) {
                         const QString name = QString::fromUtf8(pdf_annot_name(context, annot));
-                        const bool matches = !candidate.annotationName.isEmpty()
-                            ? name == candidate.annotationName
-                            : index == candidate.annotationIndex;
+                        bool matches = false;
+                        if (!candidate.annotationName.isEmpty()) {
+                            matches = name == candidate.annotationName;
+                        } else if (index == candidate.annotationIndex) {
+                            // Annotations without /NM can only be identified by
+                            // position. Re-check the type and subject so an
+                            // annotation list that shifted after the scan does
+                            // not delete an unrelated object.
+                            const QString subject = pdf_annot_has_subject(context, annot)
+                                ? QString::fromUtf8(pdf_annot_subject(context, annot)) : QString{};
+                            matches = pdf_annot_type(context, annot) == candidate.annotationType
+                                && subject == candidate.annotationSubject;
+                        }
                         if (matches) {
                             pdf_delete_annot(context, page, annot);
                             break;
@@ -1742,7 +1876,8 @@ public:
             return;
         }
         const QString absoluteTarget = targetInfo.absoluteFilePath();
-        if (signedDocument_ && QFileInfo(path_).absoluteFilePath() == absoluteTarget) {
+        if (!signedSourcePath_.isEmpty()
+            && QFileInfo(signedSourcePath_).absoluteFilePath() == absoluteTarget) {
             fail(ErrorCode::SignedDocumentRequiresSaveAs, QStringLiteral("save"),
                  tr("A signed PDF must be saved to a different file because editing invalidates signatures."));
             return;
@@ -1793,6 +1928,14 @@ public:
                  temporary.errorString());
             return;
         }
+#ifndef Q_OS_WIN
+        // The temporary file can contain decrypted document content. Start with
+        // owner-only access and restore the destination's mode before replacing
+        // it, so a multi-user POSIX host never exposes a readable copy.
+        const QFile::Permissions existingPermissions = QFileInfo::exists(absoluteTarget)
+            ? QFileInfo(absoluteTarget).permissions() : QFile::Permissions();
+        (void)temporary.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+#endif
         auto removeTemporary = qScopeGuard([temporaryPath] {
             QFile::remove(temporaryPath);
         });
@@ -1838,6 +1981,12 @@ public:
             detail = engineMessage(context);
         }
         temporary.flush();
+#ifndef Q_OS_WIN
+        if (existingPermissions != QFile::Permissions()) {
+            (void)temporary.setPermissions(existingPermissions);
+        }
+        (void)flushFileToDisk(temporary);
+#endif
         temporary.close();
         if (writeFailed) {
             fail(ErrorCode::IoError, QStringLiteral("save"),
@@ -1856,9 +2005,16 @@ public:
             return;
         }
         removeTemporary.dismiss();
+#ifndef Q_OS_WIN
+        syncDirectory(targetInfo.absolutePath());
+#endif
 
         path_ = absoluteTarget;
         modified_ = false;
+        // The file just written is a fresh copy: any signature from the source
+        // document no longer verifies, so further saves may target this path.
+        signedDocument_ = false;
+        const QString fingerprint = computeFileFingerprint(absoluteTarget);
         if (options.encryption.algorithm != EncryptionAlgorithm::Keep) {
             encrypted_ = options.encryption.algorithm != EncryptionAlgorithm::None;
             secureClear(password_);
@@ -1866,7 +2022,9 @@ public:
                 password_ = userPassword;
             }
         }
-        post([absoluteTarget](DocumentSession *owner) { emit owner->saved(absoluteTarget); });
+        post([absoluteTarget, fingerprint](DocumentSession *owner) {
+            emit owner->saved(absoluteTarget, fingerprint);
+        });
         emitState();
     }
 
@@ -1922,7 +2080,9 @@ private:
     struct CandidateRecord {
         WatermarkCandidate publicValue;
         QString annotationName;
+        QString annotationSubject;
         int annotationIndex = -1;
+        enum pdf_annot_type annotationType = PDF_ANNOT_UNKNOWN;
         bool contentStream = false;
         QString resourceBase;
     };
@@ -1968,6 +2128,10 @@ private:
     {
         renderPool_.clear();
         dropDisplayLists();
+        // Any content change invalidates previously scanned watermark records:
+        // page indices, annotation positions, and content-stream handles may all
+        // have moved. A fresh scan is required before removal.
+        candidates_.clear();
         modified_ = true;
         ++revision_;
         emitState();
@@ -1986,6 +2150,7 @@ private:
     {
         renderPool_.clear();
         dropDisplayLists();
+        candidates_.clear();
         int position = 1;
         int steps = 0;
         fz_context *context = runtime_->context();
@@ -2125,6 +2290,9 @@ private:
     quint64 revision_ = 0;
     bool encrypted_ = false;
     bool signedDocument_ = false;
+    // Path of the signed source document. It stays set for the session so the
+    // original signed file can never be overwritten by an edited copy.
+    QString signedSourcePath_;
     bool modified_ = false;
     QVector<CandidateRecord> candidates_;
 };

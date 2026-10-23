@@ -7,11 +7,13 @@ This is an engineering inventory, not legal advice. It records the dependency pa
 | Dependency | Linkage and purpose / 链接方式与用途 | License path / 许可路径 |
 |---|---|---|
 | MuPDF 1.28.2 (`fe374acc`) | Statically linked C PDF engine: parse, render, search, encrypt/decrypt, edit, annotate, redact, watermark, journal, and save. / 静态链接的 C PDF 引擎，负责解析、渲染、搜索、加解密、编辑、批注、涂黑、水印、journal 与保存。 | GNU AGPL-3.0-or-later, or a separate Artifex commercial license. / AGPL-3.0-or-later，或另购 Artifex 商业许可。 |
-| Qt 6.11.2 Core, Gui, Widgets | Dynamically linked cross-platform application framework: threads, value types, image handling, windowing, widgets, input, and localization. / 动态链接的跨平台应用框架，负责线程、值类型、图像、窗口、控件、输入与本地化。 | LGPLv3/GPLv3 or Qt commercial terms, subject to the exact Qt distribution used. / LGPLv3/GPLv3 或 Qt 商业条款，以实际 Qt 发行物为准。 |
+| Qt 6.11.2 Core, Gui, Widgets, Svg | Dynamically linked cross-platform application framework: threads, value types, image handling, windowing, widgets, input, and localization; `Qt6Svg` is pulled in by the deployed `qsvg` image-format plugin. / 动态链接的跨平台应用框架，负责线程、值类型、图像、窗口、控件、输入与本地化；`Qt6Svg` 由部署的 `qsvg` 图像格式插件引入。 | LGPLv3/GPLv3 or Qt commercial terms, subject to the exact Qt distribution used. / LGPLv3/GPLv3 或 Qt 商业条款，以实际 Qt 发行物为准。 |
 | Microsoft Visual C++ Runtime | Dynamically distributed with the Windows package from Visual Studio's Redist directory. / Windows 包从 Visual Studio Redist 目录动态分发。 | Microsoft Visual Studio redistribution terms. / Microsoft Visual Studio 再分发条款。 |
 | Operating-system APIs | Windows system libraries; equivalent native APIs are used by Qt on Linux/macOS. / Windows 系统库；Linux/macOS 由 Qt 使用对应原生 API。 | System-library exception/operating-system terms as applicable. / 适用系统库例外及操作系统条款。 |
 
-The Windows runtime also contains Qt platform/style/image-format plugins (`qwindows`, modern Windows style, GIF/ICO/JPEG) and the ICU component deployed by the selected Qt build. These are Qt/transitive runtime components, not separate nexPDF feature engines. / Windows 运行包还包含 Qt 平台、样式和图像格式插件（`qwindows`、现代 Windows 样式、GIF/ICO/JPEG），以及该 Qt 构建部署的 ICU 组件；它们属于 Qt/传递依赖，不是第二套 PDF 引擎。
+The Windows runtime also contains Qt platform/style/image-format/icon-engine plugins (`qwindows`, modern Windows style, GIF/ICO/JPEG/SVG), `Qt6Svg.dll`, and the Mesa `opengl32sw.dll` software OpenGL fallback that `windeployqt` deploys by default. There is no ICU DLL in the Windows package generated from the Qt 6.11.2 MSVC build. These are Qt/transitive runtime components, not separate nexPDF feature engines. / Windows 运行包还包含 Qt 的平台/样式/图像格式/图标引擎插件（`qwindows`、现代 Windows 样式、GIF/ICO/JPEG/SVG）、`Qt6Svg.dll`，以及 `windeployqt` 默认部署的 Mesa `opengl32sw.dll` 软件 OpenGL 回退库；基于 Qt 6.11.2 MSVC 构建的 Windows 包中不含 ICU DLL。它们属于 Qt/传递依赖，不是第二套 PDF 引擎。
+
+The LGPLv3 text for Qt must accompany binary packages. Place it at `LICENSES/LGPL-3.0.txt`; CMake then installs it into `share/nexpdf` and embeds it into the macOS bundle. See [`LICENSES/README.md`](../LICENSES/README.md). / Qt 的 LGPLv3 文本必须随二进制包分发：将其放在 `LICENSES/LGPL-3.0.txt`，CMake 会自动安装到 `share/nexpdf` 并嵌入 macOS bundle。
 
 ## MuPDF transitive components / MuPDF 传递组件
 

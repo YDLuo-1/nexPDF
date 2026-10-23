@@ -120,6 +120,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           $version = $env:RELEASE_TAG.TrimStart('v')
+          $versionParts = $version -split '[.\-]'
+          $viVersion = "{0}.{1}.{2}.0" -f $versionParts[0], $versionParts[1], $versionParts[2]
           $zipPath = "$pwd\dist\nexPDF-$($env:RELEASE_TAG)-windows-x64-portable.zip"
           $setupPath = "$pwd\dist\nexPDF-$($env:RELEASE_TAG)-windows-x64-setup.exe"
           $licensePath = "$pwd\LICENSE"
@@ -129,6 +131,7 @@ jobs:
             "/DINPUT_DIR=$pwd\stage" `
             "/DOUTPUT_FILE=$setupPath" `
             "/DVERSION=$version" `
+            "/DVI_VERSION=$viVersion" `
             "/DICON_FILE=$pwd\app\assets\nexpdf.ico" `
             "/DLICENSE_FILE=$licensePath" packaging/windows/installer.nsi
           foreach ($asset in @($zipPath, $setupPath)) {
@@ -312,6 +315,10 @@ jobs:
 
   publish:
     needs: [windows, linux, macos, source]
+    # Prereleases publish from a tag push. A stable tag must be dispatched
+    # manually after the human release-checklist gates are complete, so a
+    # mistyped or premature v1.0.0 tag cannot publish itself as "Latest".
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.ref_name, 'rc') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
     runs-on: ubuntu-24.04
     permissions:
       actions: read
@@ -332,6 +339,10 @@ jobs:
       - name: Generate checksums and validate notes
         run: |
           test -f "docs/release-notes/$RELEASE_TAG.md"
+          if [ ! -f "LICENSES/LGPL-3.0.txt" ]; then
+            echo "::error::LICENSES/LGPL-3.0.txt is required: every binary package ships LGPLv3 Qt libraries. Add the verbatim text from https://www.gnu.org/licenses/lgpl-3.0.txt before releasing."
+            exit 1
+          fi
           python tools/check_release_assets.py dist --over-limit-analysis docs/package-size-analysis.md
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@5113cdc90fd4d541c801c55356214017bf5ae34b # v3
