@@ -4,6 +4,10 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-24
+
+First stable release. The v1.0.0 tag was stopped by the new installer-verification gate (the harness could not capture GUI-app stdout) and remains as failed history without a Release; verification now redirects stdout explicitly. / 首个正式版。v1.0.0 标签被新安装器验证门槛拦下（验证脚本无法捕获 GUI 程序输出），按纪律保留为失败历史且无 Release；本版本修正后发布。
+
 ## [1.0.0] - 2026-10-24
 
 First stable release; see `docs/release-notes/v1.0.0.md` for the full verification scope. Windows and Linux carry full acceptance evidence; macOS is CI-verified without a hardware spot check. / 首个正式版；验证范围见发布说明。Windows/Linux 具备完整验收证据，macOS 仅 CI 验证未做真机抽查。

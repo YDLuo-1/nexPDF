@@ -146,8 +146,18 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }
           $exe = "$env:LOCALAPPDATA\nexPDF\bin\nexPDF.exe"
           if (-not (Test-Path $exe)) { throw 'installed exe missing' }
-          $v = & $exe --version
-          if ($LASTEXITCODE -ne 0 -or -not ($v -match [regex]::Escape($env:RELEASE_TAG))) { throw "version smoke failed: $v" }
+          # nexPDF is a GUI-subsystem executable: PowerShell's call operator
+          # cannot capture its stdout, so redirect explicitly.
+          $psi = New-Object System.Diagnostics.ProcessStartInfo
+          $psi.FileName = $exe
+          $psi.Arguments = '--version'
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardOutput = $true
+          $vp = [System.Diagnostics.Process]::Start($psi)
+          $reader = $vp.StandardOutput.ReadToEndAsync()
+          if (-not $vp.WaitForExit(15000)) { $vp.Kill(); throw 'version smoke timed out' }
+          $v = $reader.Result.Trim()
+          if ($vp.ExitCode -ne 0 -or -not ($v -match [regex]::Escape($env:RELEASE_TAG))) { throw "version smoke failed: '$v'" }
           if (-not (Test-Path 'HKCU:\Software\Classes\nexPDF.pdf\shell\open\command')) { throw 'PROGID open command not registered' }
           $regApps = (Get-ItemProperty 'HKCU:\Software\RegisteredApplications' -ErrorAction SilentlyContinue).'nexPDF'
           if (-not $regApps) { throw 'nexPDF missing from RegisteredApplications' }
