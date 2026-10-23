@@ -4,6 +4,10 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-24
+
+First stable release. The v1.0.0 and v1.0.1 tags were stopped by the new installer-verification gate (GUI-app stdout capture, then an uninstall file-handle race); both remain as failed history without a Release. / 首个正式版。v1.0.0 与 v1.0.1 标签被安装器验证门槛先后拦下（GUI 输出捕获、卸载句柄竞争），均按纪律保留为失败历史且无 Release。
+
 ## [1.0.1] - 2026-10-24
 
 First stable release. The v1.0.0 tag was stopped by the new installer-verification gate (the harness could not capture GUI-app stdout) and remains as failed history without a Release; verification now redirects stdout explicitly. / 首个正式版。v1.0.0 标签被新安装器验证门槛拦下（验证脚本无法捕获 GUI 程序输出），按纪律保留为失败历史且无 Release；本版本修正后发布。

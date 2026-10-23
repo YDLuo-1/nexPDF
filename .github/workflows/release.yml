@@ -166,6 +166,10 @@ jobs:
           if ($userChoice -eq 'nexPDF.pdf') { throw 'installer must not take over the .pdf default' }
           $u = Start-Process -FilePath "$env:LOCALAPPDATA\nexPDF\Uninstall.exe" -ArgumentList '/S' -PassThru
           if (-not $u.WaitForExit(180000)) { $u.Kill(); throw 'uninstaller timed out' }
+          # Defender real-time scanning can hold a handle on the freshly-run
+          # executable for a few seconds; tolerate slow handle release.
+          $deadline = (Get-Date).AddSeconds(45)
+          while ((Test-Path $exe) -and ((Get-Date) -lt $deadline)) { Start-Sleep -Seconds 3 }
           if (Test-Path $exe) { throw 'uninstall left the executable behind' }
           "Installer install/version/association/uninstall cycle passed on a clean runner"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
