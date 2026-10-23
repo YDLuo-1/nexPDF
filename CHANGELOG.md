@@ -4,6 +4,10 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-24
+
+First stable release; see `docs/release-notes/v1.0.0.md` for the full verification scope. Windows and Linux carry full acceptance evidence; macOS is CI-verified without a hardware spot check. / 首个正式版；验证范围见发布说明。Windows/Linux 具备完整验收证据，macOS 仅 CI 验证未做真机抽查。
+
 ## [1.0.0-rc.13] - 2026-10-24
 
 ### Fixed / 修复
