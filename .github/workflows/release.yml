@@ -137,6 +137,27 @@ jobs:
           foreach ($asset in @($zipPath, $setupPath)) {
             if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) { throw "Missing Windows release asset: $asset" }
           }
+      - name: Verify installer on this clean runner
+        shell: pwsh
+        run: |
+          $setup = "$pwd\dist\nexPDF-$($env:RELEASE_TAG)-windows-x64-setup.exe"
+          $p = Start-Process -FilePath $setup -ArgumentList '/S' -PassThru
+          if (-not $p.WaitForExit(180000)) { $p.Kill(); throw 'installer timed out' }
+          if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }
+          $exe = "$env:LOCALAPPDATA\nexPDF\bin\nexPDF.exe"
+          if (-not (Test-Path $exe)) { throw 'installed exe missing' }
+          $v = & $exe --version
+          if ($LASTEXITCODE -ne 0 -or -not ($v -match [regex]::Escape($env:RELEASE_TAG))) { throw "version smoke failed: $v" }
+          if (-not (Test-Path 'HKCU:\Software\Classes\nexPDF.pdf\shell\open\command')) { throw 'PROGID open command not registered' }
+          $regApps = (Get-ItemProperty 'HKCU:\Software\RegisteredApplications' -ErrorAction SilentlyContinue).'nexPDF'
+          if (-not $regApps) { throw 'nexPDF missing from RegisteredApplications' }
+          if (-not (Test-Path ([Environment]::GetFolderPath('Desktop') + '\nexPDF.lnk'))) { throw 'desktop shortcut missing' }
+          $userChoice = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoice' -ErrorAction SilentlyContinue).ProgId
+          if ($userChoice -eq 'nexPDF.pdf') { throw 'installer must not take over the .pdf default' }
+          $u = Start-Process -FilePath "$env:LOCALAPPDATA\nexPDF\Uninstall.exe" -ArgumentList '/S' -PassThru
+          if (-not $u.WaitForExit(180000)) { $u.Kill(); throw 'uninstaller timed out' }
+          if (Test-Path $exe) { throw 'uninstall left the executable behind' }
+          "Installer install/version/association/uninstall cycle passed on a clean runner"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-assets
