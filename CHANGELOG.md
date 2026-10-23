@@ -4,7 +4,7 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
-## [1.0.0-rc.12] - 2026-10-24
+## [1.0.0-rc.13] - 2026-10-24
 
 ### Fixed / 修复
 
@@ -15,7 +15,8 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 - PDF permissions are checked per operation: page assembly/redaction need *modify*, annotations need *annotate*. / PDF 权限按操作校验：页面编排/涂黑需要 modify，批注需要 annotate。
 - Windows EXE and setup.exe now carry file/product version resources. / Windows EXE 与安装包补齐文件/产品版本资源。
 - Text search now runs in interleaved slices on the document thread: a new search, an edit, or closing the document abandons the previous run at the next slice boundary, so thousand-page searches can no longer starve queued operations. / 文本搜索改为在文档线程上分片交错执行：新搜索、编辑或关闭文档都会在下个分片边界作废旧搜索，千页搜索不再阻塞排队操作。
-- The rc.11 Linux AppImage passed `--version` and a WSLg CJK GUI check on real Ubuntu 24.04, closing the Linux spot-check gate. / rc.11 Linux AppImage 在真实 Ubuntu 24.04 上通过 `--version` 与 WSLg 中文界面检查，Linux 抽查门槛已关闭。
+- The rc.11 Linux AppImage passed `--version` and a WSLg CJK GUI check on real Ubuntu 24.04, closing the Linux spot-check gate.
+- Binary packages now ship the verbatim LGPL-3.0 (and GPL-3.0) license texts required for the LGPLv3 Qt runtime, enforced by a publish gate. / 二进制包附带 LGPLv3 Qt 运行库所要求的 LGPL-3.0（及 GPL-3.0）许可证原文，并由发布门槛强制检查。 / rc.11 Linux AppImage 在真实 Ubuntu 24.04 上通过 `--version` 与 WSLg 中文界面检查，Linux 抽查门槛已关闭。
 - macOS DMG now ships `LICENSE` and `THIRD_PARTY_NOTICES.md` inside the bundle. / macOS DMG 的应用包内现在包含许可证与第三方声明。
 
 ### Changed / 变更
