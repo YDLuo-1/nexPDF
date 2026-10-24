@@ -10,6 +10,10 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 - Printing via File → "Print…" (`Ctrl+P`): system print dialog with the 1..page-count range, whole-page rendering at up to 300 DPI through the existing background render session, proportional centring on the printable area, and status-bar progress ending in "Printed N page(s)". / 新增文件菜单"打印…"（`Ctrl+P`）：系统打印对话框支持 1..页数范围，经既有后台渲染会话按不高于 300 DPI 整页渲染，等比居中打印到可打印区域，状态栏显示进度并最终显示"已打印 N 页"。打印路径经编译与界面集成验证（含 UI 测试），未做实体打印机输出验证。
 
+## [1.0.4] - 2026-10-24
+
+- Add printing: "Print…" (Ctrl+P) with page-range selection, 300 dpi-capped rendering, centered fit-to-page output. / 新增打印：Ctrl+P 页面范围选择，300dpi 封顶渲染，等比居中输出。
+
 ## [1.0.3] - 2026-10-24
 
 - Add local-only crash reporting (Windows minidumps, Unix signal logs, retention-capped) with a `--crash-test` verification switch, and close the embedded-font corpus gate. / 新增仅本地的崩溃报告（Windows 小型转储、Unix 信号日志、限量保留）与 `--crash-test` 自验证，并关闭嵌入式字体语料门槛。
