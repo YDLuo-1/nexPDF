@@ -18,7 +18,7 @@ qt_add_resources(nexpdf_app_ui "nexpdf_assets"
 
 target_include_directories(nexpdf_app_ui
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_BINARY_DIR}/generated")
-target_link_libraries(nexpdf_app_ui PUBLIC nexpdf_core Qt6::Core Qt6::Gui Qt6::Widgets)
+target_link_libraries(nexpdf_app_ui PUBLIC nexpdf_core Qt6::Core Qt6::Gui Qt6::Widgets Qt6::PrintSupport)
 target_compile_definitions(nexpdf_app_ui PUBLIC QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
 
 qt_add_executable(nexPDF main.cpp)

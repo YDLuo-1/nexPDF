@@ -43,6 +43,7 @@ private:
     void openPath(const QString &path, const QString &password = {});
     void chooseOpen();
     void saveAs(nexpdf::EncryptionAlgorithm mode = nexpdf::EncryptionAlgorithm::Keep);
+    void printDocument();
     void createEncryptedCopy();
     void createDecryptedCopy();
     void applyPageOperation(nexpdf::EditKind kind, int rotation = 0);
@@ -99,6 +100,7 @@ private:
 
     QAction *openAction_ = nullptr;
     QAction *saveAsAction_ = nullptr;
+    QAction *printAction_ = nullptr;
     QAction *encryptAction_ = nullptr;
     QAction *decryptAction_ = nullptr;
     QAction *closeAction_ = nullptr;
@@ -142,6 +144,9 @@ private:
     int pageCount_ = 0;
     quint64 revision_ = 0;
     quint64 nextThumbnailRequestId_ = (quint64{1} << 63);
+    // Print renders start far above the canvas range (small integers) and far
+    // below the thumbnail range so request IDs never collide across consumers.
+    quint64 nextPrintRequestId_ = (quint64{1} << 62);
     QHash<quint64, int> thumbnailRequests_;
     QHash<quint64, qreal> thumbnailDensities_;
     QSet<int> pendingThumbnailPages_;

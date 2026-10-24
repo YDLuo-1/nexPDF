@@ -6,6 +6,8 @@
 #include <QFile>
 #include <QLabel>
 #include <QMenu>
+#include <QPrintDialog>
+#include <QPrinter>
 #include <QPushButton>
 #include <QSettings>
 #include <QTemporaryDir>
@@ -62,6 +64,7 @@ class MainWindowTests final : public QObject {
 
 private slots:
     void opensFixtureAndCapturesUi();
+    void printActionOffersDialogForOpenDocument();
 };
 
 void MainWindowTests::opensFixtureAndCapturesUi()
@@ -157,6 +160,57 @@ void MainWindowTests::opensFixtureAndCapturesUi()
     if (!output.isEmpty()) {
         QVERIFY(chineseScreenshot.save(output + QStringLiteral("/ui-main-window.png")));
     }
+}
+
+void MainWindowTests::printActionOffersDialogForOpenDocument()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, directory.path());
+    QSettings settings;
+    settings.setValue(QStringLiteral("ui/language"), QStringLiteral("en"));
+    settings.sync();
+
+    const QString inputPath = directory.path() + QStringLiteral("/print-fixture.pdf");
+    QFile fixture(inputPath);
+    QVERIFY(fixture.open(QIODevice::WriteOnly));
+    QCOMPARE(fixture.write(minimalPdf()), minimalPdf().size());
+    fixture.close();
+
+    MainWindow window;
+    auto *fileMenu = window.findChild<QMenu *>(QStringLiteral("fileMenu"));
+    QVERIFY(fileMenu != nullptr);
+    QAction *printAction = nullptr;
+    for (QAction *action : fileMenu->actions()) {
+        if (action->shortcut() == QKeySequence(QKeySequence::Print)) {
+            printAction = action;
+        }
+    }
+    QVERIFY2(printAction != nullptr, "File menu has no Print action with the platform shortcut");
+    QVERIFY(!printAction->isEnabled());
+    QVERIFY(!printAction->toolTip().isEmpty());
+
+    window.setWindowOpacity(0.0);
+    window.show();
+    window.openFile(inputPath);
+    QTRY_VERIFY_WITH_TIMEOUT(printAction->isEnabled(), 10000);
+
+    // Exercise the exact dialog construction used by MainWindow::printDocument.
+    // Qt 6.9+ removed DontUseNativeDialog: Windows and macOS always run the
+    // blocking native dialog, so the dialog is only shown where it is a plain
+    // widget (Linux), including the CI GUI test environment.
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog dialog(&printer, &window);
+    dialog.setMinMax(1, 1);
+    QCOMPARE(dialog.minPage(), 1);
+    QCOMPARE(dialog.maxPage(), 1);
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+    dialog.show();
+    QTRY_VERIFY(dialog.isVisible());
+    dialog.close();
+    QTRY_VERIFY(!dialog.isVisible());
+#endif
 }
 
 QTEST_MAIN(MainWindowTests)

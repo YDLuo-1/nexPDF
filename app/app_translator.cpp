@@ -138,7 +138,12 @@ AppTranslator::AppTranslator(QObject *parent) : QTranslator(parent)
         {"Search cleared", "已清除搜索高亮"},
         {"Drag a rectangle on the page to place the text", "在页面上拖动一个矩形放置文字"},
         {"Drag a rectangle on the page to place the image", "在页面上拖动一个矩形放置图片"},
-        {"Placement cancelled", "已取消放置"}
+        {"Placement cancelled", "已取消放置"},
+        {"Print…", "打印…"},
+        {"Unable to open the printer.", "无法打开打印机。"},
+        {"Printing page %1 of %2", "正在打印第 %1 / %2 页"},
+        {"Printed %1 page(s)", "已打印 %1 页"},
+        {"Printing failed", "打印失败"}
     };
     for (const auto &[english, chinese] : entries) {
         translations_.insert(QString::fromUtf8(english), QString::fromUtf8(chinese));

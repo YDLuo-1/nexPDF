@@ -21,6 +21,7 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QEvent>
+#include <QEventLoop>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -36,6 +37,9 @@
 #include <QMessageBox>
 #include <QMimeData>
 #include <QPalette>
+#include <QPainter>
+#include <QPrintDialog>
+#include <QPrinter>
 #include <QPushButton>
 #include <QPolygonF>
 #include <QScrollArea>
@@ -560,6 +564,7 @@ void MainWindow::buildMenus()
 {
     openAction_ = new QAction(this);
     saveAsAction_ = new QAction(this);
+    printAction_ = new QAction(this);
     encryptAction_ = new QAction(this);
     decryptAction_ = new QAction(this);
     closeAction_ = new QAction(this);
@@ -633,6 +638,7 @@ void MainWindow::buildMenus()
 
     openAction_->setShortcut(QKeySequence::Open);
     saveAsAction_->setShortcut(QKeySequence::SaveAs);
+    printAction_->setShortcut(QKeySequence::Print);
     undoAction_->setShortcut(QKeySequence::Undo);
     redoAction_->setShortcut(QKeySequence::Redo);
     zoomInAction_->setShortcut(QKeySequence::ZoomIn);
@@ -673,6 +679,7 @@ void MainWindow::buildMenus()
 
     connect(openAction_, &QAction::triggered, this, &MainWindow::chooseOpen);
     connect(saveAsAction_, &QAction::triggered, this, [this] { saveAs(); });
+    connect(printAction_, &QAction::triggered, this, &MainWindow::printDocument);
     connect(encryptAction_, &QAction::triggered, this, &MainWindow::createEncryptedCopy);
     connect(decryptAction_, &QAction::triggered, this, &MainWindow::createDecryptedCopy);
     connect(closeAction_, &QAction::triggered, this, [this] { if (confirmDiscard()) session_.close(); });
@@ -732,7 +739,7 @@ void MainWindow::buildMenus()
 
     auto *fileMenu = menuBar()->addMenu(QString());
     fileMenu->setObjectName(QStringLiteral("fileMenu"));
-    fileMenu->addActions({openAction_, saveAsAction_, encryptAction_, decryptAction_});
+    fileMenu->addActions({openAction_, saveAsAction_, printAction_, encryptAction_, decryptAction_});
     fileMenu->addSeparator();
     fileMenu->addActions({closeAction_, exitAction_});
     auto *editMenu = menuBar()->addMenu(QString());
@@ -831,7 +838,7 @@ void MainWindow::buildMenus()
     addLabeledAction(editToolbar, applyRedactionsAction_, QStringLiteral("applyRedactionsToolButton"),
                      Qt::ToolButtonTextUnderIcon);
 
-    documentActions_ = {saveAsAction_, encryptAction_, decryptAction_, closeAction_,
+    documentActions_ = {saveAsAction_, printAction_, encryptAction_, decryptAction_, closeAction_,
                         insertPageAction_, importPagesAction_, deletePageAction_,
                         movePageUpAction_, movePageDownAction_, rotateLeftAction_, rotateRightAction_,
                         zoomInAction_, zoomOutAction_, actualSizeAction_, fitWidthAction_,
@@ -935,6 +942,7 @@ void MainWindow::retranslateUi()
 {
     openAction_->setText(tr("Open…"));
     saveAsAction_->setText(tr("Save As…"));
+    printAction_->setText(tr("Print…"));
     encryptAction_->setText(tr("Create encrypted copy…"));
     decryptAction_->setText(tr("Create decrypted copy…"));
     closeAction_->setText(tr("Close"));
@@ -981,7 +989,7 @@ void MainWindow::retranslateUi()
         action->setStatusTip(description);
     };
     const QList<QAction *> selfDescribingActions = {
-        openAction_, saveAsAction_, encryptAction_, decryptAction_, undoAction_, redoAction_,
+        openAction_, saveAsAction_, printAction_, encryptAction_, decryptAction_, undoAction_, redoAction_,
         insertPageAction_, importPagesAction_, deletePageAction_, movePageUpAction_, movePageDownAction_,
         rotateLeftAction_, rotateRightAction_, zoomInAction_, zoomOutAction_, actualSizeAction_,
         fitWidthAction_, eyeCareAction_, previousPageAction_, nextPageAction_, addTextAction_, addImageAction_, highlightAction_,
@@ -1194,6 +1202,109 @@ void MainWindow::createEncryptedCopy()
 void MainWindow::createDecryptedCopy()
 {
     saveAs(nexpdf::EncryptionAlgorithm::None);
+}
+
+void MainWindow::printDocument()
+{
+    if (pageCount_ <= 0 || revision_ == 0) {
+        return;
+    }
+
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog dialog(&printer, this);
+    dialog.setMinMax(1, pageCount_);
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    int fromPage = printer.fromPage();
+    int toPage = printer.toPage();
+    if (fromPage < 1 || fromPage > pageCount_) fromPage = 1;
+    if (toPage < fromPage || toPage > pageCount_) toPage = pageCount_;
+
+    const quint64 printRevision = revision_;
+    const qreal scale = qMin(printer.resolution(), 300) / 72.0;
+
+    QPainter painter;
+    if (!painter.begin(&printer)) {
+        QMessageBox::warning(this, tr("Error"), tr("Unable to open the printer."));
+        statusLabel_->setText(tr("Printing failed"));
+        return;
+    }
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+
+    int printed = 0;
+    for (int page = fromPage; page <= toPage; ++page) {
+        if (revision_ != printRevision || pageCount_ <= 0) {
+            // The document changed underneath the print job; a queued render
+            // would be dropped silently, so stop instead of waiting forever.
+            statusLabel_->setText(tr("Printing failed"));
+            return;
+        }
+        statusLabel_->setText(tr("Printing page %1 of %2").arg(page).arg(toPage));
+
+        const quint64 requestId = nextPrintRequestId_++;
+        nexpdf::RenderRequest request;
+        request.requestId = requestId;
+        request.revision = printRevision;
+        request.pageIndex = page - 1;
+        request.scale = scale;  // Empty tilePixels renders the full page.
+        request.priority = 20;
+
+        QImage image;
+        bool renderFailed = false;
+        QEventLoop loop;
+        const auto readyConnection = connect(&session_, &nexpdf::DocumentSession::renderReady,
+            &loop, [&](const nexpdf::RenderResult &result) {
+                if (result.requestId != requestId) return;
+                image = result.image;
+                loop.quit();
+            });
+        // A render failure also reaches MainWindow::showError, which already
+        // presents the message box; here it only has to release the loop.
+        const auto failedConnection = connect(&session_, &nexpdf::DocumentSession::failed,
+            &loop, [&](const nexpdf::OperationError &) {
+                renderFailed = true;
+                loop.quit();
+            });
+        const auto closedConnection = connect(&session_, &nexpdf::DocumentSession::closed,
+            &loop, [&] { renderFailed = true; loop.quit(); });
+        session_.requestRender(request);
+        loop.exec();
+        disconnect(readyConnection);
+        disconnect(failedConnection);
+        disconnect(closedConnection);
+
+        if (renderFailed) {
+            statusLabel_->setText(tr("Printing failed"));
+            return;
+        }
+        if (image.isNull() || revision_ != printRevision) {
+            QMessageBox::warning(this, tr("Error"), tr("Unable to render the page."));
+            statusLabel_->setText(tr("Printing failed"));
+            return;
+        }
+
+        // Fit the rendered page proportionally and centred onto the printable
+        // area. The image was rendered at `scale * 72` DPI, so restore physical
+        // size at the printer resolution before clamping to the page rect.
+        const QRectF pageRect = printer.pageRect(QPrinter::DevicePixel);
+        const qreal imageDpi = scale * 72.0;
+        QSizeF targetSize(image.width() * printer.resolution() / imageDpi,
+                          image.height() * printer.resolution() / imageDpi);
+        targetSize.scale(pageRect.size(), Qt::KeepAspectRatio);
+        painter.drawImage(QRectF(pageRect.left() + (pageRect.width() - targetSize.width()) / 2.0,
+                                 pageRect.top() + (pageRect.height() - targetSize.height()) / 2.0,
+                                 targetSize.width(), targetSize.height()),
+                          image);
+        ++printed;
+        if (page < toPage && !printer.newPage()) {
+            statusLabel_->setText(tr("Printing failed"));
+            return;
+        }
+    }
+    painter.end();
+    statusLabel_->setText(tr("Printed %1 page(s)").arg(printed));
 }
 
 void MainWindow::applyPageOperation(const nexpdf::EditKind kind, const int rotation)
