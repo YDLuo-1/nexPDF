@@ -6,6 +6,10 @@ Please report suspected vulnerabilities privately through GitHub Security Adviso
 
 Supported releases receive fixes on the latest stable branch. nexPDF does not provide password cracking, DRM bypass, silent external links, embedded-file execution, or automatic PDF JavaScript execution. Malicious PDFs should still be treated as untrusted input and processed in an isolated account or virtual machine when risk is high.
 
+Crash reports stay on your disk: after a crash, nexPDF writes a minidump (Windows) or a signal log (Linux/macOS) under its own settings directory (`crashes/`, at most five files, never uploaded anywhere). A minidump can contain fragments of documents that were open at the time; delete the `crashes` folder at any time, or attach a dump to a bug report only if you accept that it may contain such fragments.
+
+崩溃报告仅保留在本机：发生崩溃时 nexPDF 会在自身设置目录的 `crashes/` 下写入小型转储（Windows）或信号日志（Linux/macOS），最多保留 5 个文件，绝不上传。小型转储可能包含崩溃时打开文档的内存片段；可随时删除 `crashes` 目录，仅在接受这一点时才将转储附加到问题报告。
+
 Encrypted output requires non-empty user and owner passwords. Matching passwords are permitted because they do not weaken AES confidentiality, but some readers may treat the credential only as a user password and fail to grant owner privileges. Password parameters use `SecurePassword`, which owns a deep copy and zeroes it on destruction; temporary byte buffers, MuPDF write buffers, and the document-session password cache are overwritten when they are no longer needed. Operating-system paging and copies owned by GUI/platform internals remain outside the process's secure-erasure guarantee.
 
 加密输出必须设置非空用户密码和所有者密码。两个密码相同不会削弱 AES 保密性，因此仍允许使用；但部分阅读器可能只把它识别为用户密码，无法授予所有者权限。密码参数使用 `SecurePassword`（独占深拷贝并在析构时清零）；临时字节缓冲区、MuPDF 写入缓冲区和文档会话密码缓存在不再需要时会被覆盖清理。操作系统换页以及 GUI/平台内部持有的副本不在进程安全擦除保证范围内。

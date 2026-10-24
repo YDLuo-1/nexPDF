@@ -4,6 +4,10 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-10-24
+
+- Add local-only crash reporting (Windows minidumps, Unix signal logs, retention-capped) with a `--crash-test` verification switch, and close the embedded-font corpus gate. / 新增仅本地的崩溃报告（Windows 小型转储、Unix 信号日志、限量保留）与 `--crash-test` 自验证，并关闭嵌入式字体语料门槛。
+
 ## [1.0.2] - 2026-10-24
 
 First stable release. The v1.0.0 and v1.0.1 tags were stopped by the new installer-verification gate (GUI-app stdout capture, then an uninstall file-handle race); both remain as failed history without a Release. / 首个正式版。v1.0.0 与 v1.0.1 标签被安装器验证门槛先后拦下（GUI 输出捕获、卸载句柄竞争），均按纪律保留为失败历史且无 Release。

@@ -1,4 +1,5 @@
 #include "app_icons.h"
+#include "crash_handler.h"
 #include "main_window.h"
 
 #include "nexpdf/version.h"
@@ -13,6 +14,11 @@
 
 int main(int argc, char *argv[])
 {
+    // QStandardPaths needs these before the crash handler resolves its
+    // directory; both setters work without a QCoreApplication instance.
+    QCoreApplication::setApplicationName(QStringLiteral("nexPDF"));
+    QCoreApplication::setOrganizationName(QStringLiteral("nexPDF"));
+    nexpdf::crash::install();
     for (int index = 1; index < argc; ++index) {
         if (argv[index] != nullptr
             && (std::strcmp(argv[index], "--version") == 0
@@ -20,6 +26,13 @@ int main(int argc, char *argv[])
             std::printf("nexPDF %s\n", NEXPDF_VERSION);
             std::fflush(stdout);
             return 0;
+        }
+        // Hidden verification aid for the crash reporter: deliberately fault so
+        // the produced dump/report can be checked locally.
+        if (argv[index] != nullptr && std::strcmp(argv[index], "--crash-test") == 0) {
+            volatile int *fault = nullptr;
+            *fault = 1;
+            return 2;
         }
     }
 

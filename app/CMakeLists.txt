@@ -3,6 +3,8 @@ add_library(nexpdf_app_ui STATIC
   app_icons.h
   app_translator.cpp
   app_translator.h
+  crash_handler.cpp
+  crash_handler.h
   main_window.cpp
   main_window.h
   pdf_canvas.cpp
@@ -23,6 +25,7 @@ qt_add_executable(nexPDF main.cpp)
 target_link_libraries(nexPDF PRIVATE nexpdf_app_ui)
 
 if(WIN32)
+  target_link_libraries(nexPDF PRIVATE dbghelp)
   # The resource template carries the file/product version, so Windows Explorer
   # and the installer show the same version as `nexPDF --version`. Forward
   # slashes keep the absolute icon path free of .rc escaping.
