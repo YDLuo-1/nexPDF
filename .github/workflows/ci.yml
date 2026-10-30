@@ -249,6 +249,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang ninja-build
+          python3 tools/patch_mupdf.py third_party/mupdf
           # MuPDF's GCC sanitizer macros do not detect this Clang; retain its aligned sanitizer layout.
           make -C third_party/mupdf -j3 build=sanitize OUT=build/fuzz CC=clang CXX=clang++ \
             shared=no HAVE_CURL=no HAVE_GLUT=no HAVE_X11=no HAVE_TESSERACT=no HAVE_LEPTONICA=no HAVE_ZXINGCPP=no \

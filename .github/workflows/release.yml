@@ -347,6 +347,7 @@ jobs:
         run: |
           test "$(git -C third_party/mupdf rev-parse HEAD)" = "da5f5eb890d7b3fb76903160b5f7f48ba1301492"
           git -C third_party/mupdf submodule foreach --recursive 'test -n "$(git rev-parse HEAD)"'
+          python3 tools/patch_mupdf.py third_party/mupdf
           mkdir -p dist "nexPDF-$RELEASE_TAG"
           tar --exclude=.git --exclude=build --exclude=out --exclude=dist --exclude=.tools \
             -cf - . | tar -xf - -C "nexPDF-$RELEASE_TAG"

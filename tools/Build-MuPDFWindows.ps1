@@ -33,6 +33,8 @@ if ([string]::IsNullOrWhiteSpace($MSBuildPath) -or -not (Test-Path -LiteralPath 
 }
 
 & (Join-Path $PSScriptRoot "Initialize-MuPDFDependencies.ps1") -MuPDFRoot $MuPDFRoot
+python (Join-Path $PSScriptRoot "patch_mupdf.py") $MuPDFRoot
+if ($LASTEXITCODE -ne 0) { throw "MuPDF maintenance patch failed." }
 
 $solution = Join-Path $MuPDFRoot "platform\win32\mupdf.sln"
 # bin2coff is a Win32 host tool even for x64 MuPDF. Building through the solution

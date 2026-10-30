@@ -8,6 +8,8 @@ jobs="${NEXPDF_BUILD_JOBS:-2}"
 feature_flags="-DFZ_ENABLE_OCR_OUTPUT=0 -DFZ_ENABLE_DOCX_OUTPUT=0 -DFZ_ENABLE_ODT_OUTPUT=0 -DFZ_ENABLE_BARCODE=0"
 arch_flags=""
 
+python3 "$repo_root/tools/patch_mupdf.py" "$mupdf_root"
+
 mkdir -p "$output_root/include" "$output_root/lib"
 rm -rf "$output_root/include/mupdf"
 cp -R "$mupdf_root/include/mupdf" "$output_root/include/"
