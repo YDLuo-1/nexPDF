@@ -257,28 +257,28 @@ void DocumentSessionTests::encryptsAndDecryptsWithValidation()
     QSignalSpy encryptedOpened(&reader, &nexpdf::DocumentSession::opened);
     QSignalSpy readerFailed(&reader, &nexpdf::DocumentSession::failed);
     reader.open(encryptedPath);
-    QTRY_COMPARE_WITH_TIMEOUT(passwordRequired.size(), 1, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(passwordRequired.size(), 1, cryptoTimeoutMs);
 
     nexpdf::OpenOptions wrongPassword;
     wrongPassword.password = QStringLiteral("wrong-password");
     reader.open(encryptedPath, wrongPassword);
-    QTRY_COMPARE_WITH_TIMEOUT(readerFailed.size(), 1, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(readerFailed.size(), 1, cryptoTimeoutMs);
     QCOMPARE(qvariant_cast<nexpdf::OperationError>(readerFailed.first().first()).code,
              nexpdf::ErrorCode::IncorrectPassword);
 
     nexpdf::OpenOptions password;
     password.password = QStringLiteral("用户-123");
     reader.open(encryptedPath, password);
-    QTRY_COMPARE_WITH_TIMEOUT(encryptedOpened.size(), 1, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(encryptedOpened.size(), 1, cryptoTimeoutMs);
 
     QSignalSpy decryptedSaved(&reader, &nexpdf::DocumentSession::saved);
     password.password = QStringLiteral("owner-456");
     reader.open(encryptedPath, password);
-    QTRY_COMPARE_WITH_TIMEOUT(encryptedOpened.size(), 2, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(encryptedOpened.size(), 2, cryptoTimeoutMs);
     nexpdf::SaveOptions decryption;
     decryption.encryption.algorithm = nexpdf::EncryptionAlgorithm::None;
     reader.saveAs(decryptedPath, decryption);
-    QTRY_COMPARE_WITH_TIMEOUT(decryptedSaved.size(), 1, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(decryptedSaved.size(), 1, cryptoTimeoutMs);
 
     nexpdf::DocumentSession verification;
     QSignalSpy verified(&verification, &nexpdf::DocumentSession::opened);
@@ -290,7 +290,7 @@ void DocumentSessionTests::encryptsAndDecryptsWithValidation()
     nexpdf::OpenOptions ownerPassword;
     ownerPassword.password = QStringLiteral("owner-456");
     ownerReader.open(encryptedPath, ownerPassword);
-    QTRY_COMPARE_WITH_TIMEOUT(ownerOpened.size(), 1, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(ownerOpened.size(), 1, cryptoTimeoutMs);
     retainArtifact(encryptedPath, QStringLiteral("aes256-unicode.pdf"));
     retainArtifact(decryptedPath, QStringLiteral("decrypted.pdf"));
 }
@@ -949,9 +949,9 @@ void DocumentSessionTests::keepAfterEncryptionMustStayEncrypted()
         nexpdf::DocumentSession reader;
         QSignalSpy prompts(&reader, &nexpdf::DocumentSession::passwordRequired),
             ropen(&reader, &nexpdf::DocumentSession::opened), text(&reader, &nexpdf::DocumentSession::textExtracted);
-        reader.open(path); QTRY_COMPARE(prompts.size(), 1);
+        reader.open(path); QTRY_COMPARE_WITH_TIMEOUT(prompts.size(), 1, cryptoTimeoutMs);
         nexpdf::OpenOptions auth; auth.password = QStringLiteral("owner-所有者");
-        reader.open(path, auth); QTRY_COMPARE(ropen.size(), 1);
+        reader.open(path, auth); QTRY_COMPARE_WITH_TIMEOUT(ropen.size(), 1, cryptoTimeoutMs);
         QVERIFY(qvariant_cast<nexpdf::DocumentInfo>(ropen.first().first()).canCopy);
         reader.extractText(0, QRectF(0, 0, 300, 400)); QTRY_COMPARE(text.size(), 1);
         QVERIFY(text.first().at(2).toString().contains(QStringLiteral("nexPDF")));
@@ -962,7 +962,7 @@ void DocumentSessionTests::keepAfterEncryptionMustStayEncrypted()
     }
     enc.encryption = {};
     enc.encryption.algorithm = nexpdf::EncryptionAlgorithm::None;
-    session.saveAs(d.filePath(QStringLiteral("plain.pdf")), enc); QTRY_COMPARE(saved.size(), 5);
+    session.saveAs(d.filePath(QStringLiteral("plain.pdf")), enc); QTRY_COMPARE_WITH_TIMEOUT(saved.size(), 5, cryptoTimeoutMs);
     const QString plain = d.filePath(QStringLiteral("plain-keep.pdf"));
     session.saveAs(plain); QTRY_COMPARE(saved.size(), 6);
     nexpdf::DocumentSession reader;
@@ -1234,7 +1234,7 @@ void DocumentSessionTests::protectedExportsRequireAuthorization()
     nexpdf::OpenOptions auth;
     if (!emptyUserPassword) auth.password = QStringLiteral("reader");
     reader.open(operation == 2 ? input : encrypted, operation == 2 ? nexpdf::OpenOptions{} : auth);
-    QTRY_COMPARE(ropen.size(), 1);
+    QTRY_COMPARE_WITH_TIMEOUT(ropen.size(), 1, cryptoTimeoutMs);
     QTRY_VERIFY(!states.isEmpty());
     const auto before = states.size();
     nexpdf::EditOperation import;
@@ -1243,7 +1243,7 @@ void DocumentSessionTests::protectedExportsRequireAuthorization()
     nexpdf::SaveOptions options = encryption;
     if (operation == 0) options.encryption.algorithm = nexpdf::EncryptionAlgorithm::None;
     if (operation == 2) reader.applyEdit(import); else reader.saveAs(output, options);
-    QTRY_VERIFY(!failed.isEmpty() || !exported.isEmpty() || !pageCounts.isEmpty());
+    QTRY_VERIFY_WITH_TIMEOUT(!failed.isEmpty() || !exported.isEmpty() || !pageCounts.isEmpty(), cryptoTimeoutMs);
     if (failed.isEmpty()) qInfo() << "Unauthorized operation succeeded:" << operation
                                  << "saved:" << exported.size() << "page-count events:" << pageCounts.size();
     QCOMPARE(failed.size(), 1);
@@ -1255,11 +1255,11 @@ void DocumentSessionTests::protectedExportsRequireAuthorization()
     if (operation != 2) {
         reader.saveAs(dir.filePath(QStringLiteral("keep.pdf"))); QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, cryptoTimeoutMs);
         auth.password = QStringLiteral("owner");
-        reader.open(encrypted, auth); QTRY_COMPARE(ropen.size(), 2);
+        reader.open(encrypted, auth); QTRY_COMPARE_WITH_TIMEOUT(ropen.size(), 2, cryptoTimeoutMs);
         reader.saveAs(output, options); QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 2, cryptoTimeoutMs);
     } else {
         import.sourcePassword = QStringLiteral("owner");
-        reader.applyEdit(import); QTRY_VERIFY(states.size() > before);
+        reader.applyEdit(import); QTRY_VERIFY_WITH_TIMEOUT(states.size() > before, cryptoTimeoutMs);
     }
     QCOMPARE(failed.size(), 1);
 }

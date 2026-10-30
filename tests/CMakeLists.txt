@@ -6,7 +6,7 @@ add_test(NAME nexpdf_core_tests COMMAND nexpdf_core_tests
 set_tests_properties(nexpdf_core_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 set_tests_properties(nexpdf_core_tests PROPERTIES TIMEOUT 120)
 if(NEXPDF_ENABLE_SANITIZERS)
-  set_tests_properties(nexpdf_core_tests PROPERTIES TIMEOUT 300)
+  set_tests_properties(nexpdf_core_tests PROPERTIES TIMEOUT 600)
 endif()
 if(WIN32)
   add_custom_command(TARGET nexpdf_core_tests POST_BUILD
