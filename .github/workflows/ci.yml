@@ -249,9 +249,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang ninja-build
+          # MuPDF's GCC sanitizer macros do not detect this Clang; retain its aligned sanitizer layout.
           make -C third_party/mupdf -j3 build=sanitize OUT=build/fuzz CC=clang CXX=clang++ \
             shared=no HAVE_CURL=no HAVE_GLUT=no HAVE_X11=no HAVE_TESSERACT=no HAVE_LEPTONICA=no HAVE_ZXINGCPP=no \
-            XCFLAGS="-fsanitize=fuzzer-no-link -DFZ_ENABLE_OCR_OUTPUT=0 -DFZ_ENABLE_DOCX_OUTPUT=0 -DFZ_ENABLE_ODT_OUTPUT=0 -DFZ_ENABLE_BARCODE=0" libs
+            XCFLAGS="-fsanitize=fuzzer-no-link -DFZ_POINTER_ALIGN_MOD=FZ_MEMORY_BLOCK_ALIGN_MOD -DFZ_ENABLE_OCR_OUTPUT=0 -DFZ_ENABLE_DOCX_OUTPUT=0 -DFZ_ENABLE_ODT_OUTPUT=0 -DFZ_ENABLE_BARCODE=0" libs
           mkdir -p "$RUNNER_TEMP/mupdf-fuzz/lib" "$RUNNER_TEMP/mupdf-fuzz/include"
           cp -R third_party/mupdf/include/mupdf "$RUNNER_TEMP/mupdf-fuzz/include/"
           cp third_party/mupdf/build/fuzz/libmupdf*.a "$RUNNER_TEMP/mupdf-fuzz/lib/"
