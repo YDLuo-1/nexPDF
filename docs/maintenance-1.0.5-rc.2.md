@@ -68,6 +68,14 @@ it returned the original image unchanged; that extra owned reference is now rele
 The failure-history regression also covers an annotation created before loading a
 missing stamp image. Successful and failed edits remain in the instrumented suite.
 
+Run [41006101983](https://github.com/YDLuo-1/nexPDF/actions/runs/41006101983) no longer
+reported sanitizer violations, but seven Qt Test checks exceeded their five-second
+wait: instrumented AES operations completed in 5.15–5.65 seconds. Encryption-save
+checks now allow 30 seconds and the instrumented suite has a 300-second outer limit;
+ordinary CTest retains 120 seconds. Assertions and sanitizer failure gates are unchanged.
+The changed core test executable was rebuilt locally and passed all 31 rows in
+13.64 seconds; the application and UI test binary were unchanged by this adjustment.
+
 Local compact evidence: `out/second-pass-20261030` (ignored), with baseline/final
 test logs, build logs, fixture hash and release verification. Rebuildable downloads,
 fixture-generator binaries and package extraction are removed after validation.

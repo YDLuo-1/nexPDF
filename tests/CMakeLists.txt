@@ -5,6 +5,9 @@ add_test(NAME nexpdf_core_tests COMMAND nexpdf_core_tests
   -o ${CMAKE_BINARY_DIR}/Testing/nexpdf-core-test.txt,txt)
 set_tests_properties(nexpdf_core_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 set_tests_properties(nexpdf_core_tests PROPERTIES TIMEOUT 120)
+if(NEXPDF_ENABLE_SANITIZERS)
+  set_tests_properties(nexpdf_core_tests PROPERTIES TIMEOUT 300)
+endif()
 if(WIN32)
   add_custom_command(TARGET nexpdf_core_tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:nexpdf_core_tests>

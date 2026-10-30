@@ -268,7 +268,7 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=0:print_stacktrace=1
         run: |
           mkdir -p "$RUNNER_TEMP/fuzz-results"
-          ctest --test-dir build/fuzz --verbose --timeout 120 \
+          ctest --test-dir build/fuzz --verbose --timeout 300 \
             2>&1 | tee "$RUNNER_TEMP/fuzz-results/core-run.log"
           if grep -q 'runtime error:' "$RUNNER_TEMP/fuzz-results/core-run.log"; then
             echo '::error::UBSan core diagnostics must be fixed before publishing'

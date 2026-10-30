@@ -9,6 +9,9 @@
 
 namespace {
 
+// AES-256 key derivation takes over five seconds in the instrumented Debug build.
+constexpr int cryptoTimeoutMs = 30000;
+
 QByteArray assemblePdf(const QList<QByteArray> &objects)
 {
     QByteArray pdf = "%PDF-1.7\n%\xE2\xE3\xCF\xD3\n";
@@ -245,7 +248,7 @@ void DocumentSessionTests::encryptsAndDecryptsWithValidation()
     encryption.encryption.userPassword = QStringLiteral("用户-123");
     encryption.encryption.ownerPassword = QStringLiteral("owner-456");
     writer.saveAs(encryptedPath, encryption);
-    QTRY_VERIFY_WITH_TIMEOUT(saved.size() == 1 || failed.size() == 1, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(saved.size() == 1 || failed.size() == 1, cryptoTimeoutMs);
     QVERIFY2(failed.isEmpty(), qPrintable(errorDescription(failed)));
     QVERIFY(QFileInfo::exists(encryptedPath));
 
@@ -939,10 +942,10 @@ void DocumentSessionTests::keepAfterEncryptionMustStayEncrypted()
     enc.encryption.ownerPassword = QStringLiteral("owner-所有者");
     enc.encryption.permissions.copy = false;
     QString path = d.filePath(QStringLiteral("encrypted.pdf"));
-    session.saveAs(path, enc); QTRY_COMPARE(saved.size(), 1);
+    session.saveAs(path, enc); QTRY_COMPARE_WITH_TIMEOUT(saved.size(), 1, cryptoTimeoutMs);
     for (int i = 0; i < 3; ++i) {
         path = d.filePath(QStringLiteral("keep-%1.pdf").arg(i));
-        session.saveAs(path); QTRY_COMPARE(saved.size(), i + 2);
+        session.saveAs(path); QTRY_COMPARE_WITH_TIMEOUT(saved.size(), i + 2, cryptoTimeoutMs);
         nexpdf::DocumentSession reader;
         QSignalSpy prompts(&reader, &nexpdf::DocumentSession::passwordRequired),
             ropen(&reader, &nexpdf::DocumentSession::opened), text(&reader, &nexpdf::DocumentSession::textExtracted);
@@ -955,7 +958,7 @@ void DocumentSessionTests::keepAfterEncryptionMustStayEncrypted()
         // A new session must also retain the existing key when saving with Keep.
         QSignalSpy rsaved(&reader, &nexpdf::DocumentSession::saved);
         reader.saveAs(d.filePath(QStringLiteral("reopened-%1.pdf").arg(i)));
-        QTRY_COMPARE(rsaved.size(), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(rsaved.size(), 1, cryptoTimeoutMs);
     }
     enc.encryption = {};
     enc.encryption.algorithm = nexpdf::EncryptionAlgorithm::None;
@@ -1067,7 +1070,7 @@ void DocumentSessionTests::savePreservesRedoAndFailedSaveState()
     replace.encryption.algorithm = nexpdf::EncryptionAlgorithm::Aes256;
     replace.encryption.userPassword = QStringLiteral("reader");
     replace.encryption.ownerPassword = QStringLiteral("owner");
-    s.saveAs(blocked, replace); QTRY_COMPARE(failed.size(), 1);
+    s.saveAs(blocked, replace); QTRY_COMPARE_WITH_TIMEOUT(failed.size(), 1, cryptoTimeoutMs);
     QVERIFY(states.last().at(1).toBool());
     const QString recovered = d.filePath(QStringLiteral("recovered.pdf"));
     s.saveAs(recovered); QTRY_COMPARE(saved.size(), 4);
@@ -1221,7 +1224,7 @@ void DocumentSessionTests::protectedExportsRequireAuthorization()
     if (emptyUserPassword) {
         QVERIFY(QFile::copy(QFINDTESTDATA("fixtures/empty-user-restricted.pdf"), encrypted));
     } else {
-        writer.saveAs(encrypted, encryption); QTRY_COMPARE(saved.size(), 1);
+        writer.saveAs(encrypted, encryption); QTRY_COMPARE_WITH_TIMEOUT(saved.size(), 1, cryptoTimeoutMs);
     }
 
     nexpdf::DocumentSession reader;
@@ -1250,10 +1253,10 @@ void DocumentSessionTests::protectedExportsRequireAuthorization()
 
     // Denied export must leave the session usable; an owner can perform the operation.
     if (operation != 2) {
-        reader.saveAs(dir.filePath(QStringLiteral("keep.pdf"))); QTRY_COMPARE(exported.size(), 1);
+        reader.saveAs(dir.filePath(QStringLiteral("keep.pdf"))); QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, cryptoTimeoutMs);
         auth.password = QStringLiteral("owner");
         reader.open(encrypted, auth); QTRY_COMPARE(ropen.size(), 2);
-        reader.saveAs(output, options); QTRY_COMPARE(exported.size(), 2);
+        reader.saveAs(output, options); QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 2, cryptoTimeoutMs);
     } else {
         import.sourcePassword = QStringLiteral("owner");
         reader.applyEdit(import); QTRY_VERIFY(states.size() > before);
