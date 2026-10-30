@@ -269,6 +269,14 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/fuzz-corpus" "$RUNNER_TEMP/fuzz-results"
           cp tests/fuzz/seeds/*.pdf "$RUNNER_TEMP/fuzz-corpus/"
+          # Collect every seed UBSan diagnostic, then fail explicitly before strict mutation fuzzing.
+          UBSAN_OPTIONS=halt_on_error=0:print_stacktrace=1 build/fuzz/nexpdf_fuzz_open \
+            tests/fuzz/seeds/*.pdf -runs=1 -timeout=5 -rss_limit_mb=2048 \
+            2>&1 | tee "$RUNNER_TEMP/fuzz-results/seeds.log"
+          if grep -q 'runtime error:' "$RUNNER_TEMP/fuzz-results/seeds.log"; then
+            echo '::error::UBSan seed diagnostics must be fixed before mutation fuzzing'
+            exit 1
+          fi
           build/fuzz/nexpdf_fuzz_open "$RUNNER_TEMP/fuzz-corpus" -seed=1234 -max_len=65536 \
             -max_total_time=30 -timeout=5 -rss_limit_mb=2048 -artifact_prefix="$RUNNER_TEMP/fuzz-results/" \
             2>&1 | tee "$RUNNER_TEMP/fuzz-results/run.log"

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Apply the narrow Little CMS callback fix to MuPDF's pinned source."""
+"""Apply the small sanitizer-confirmed fixes to MuPDF's pinned source."""
 
 import sys
 from pathlib import Path
 
 
-def main() -> None:
+def patch_cms() -> None:
     source = Path(sys.argv[1]) / "thirdparty/lcms2/src/cmsopt.c"
     text = source.read_text(encoding="utf-8")
     anchor = "static\ncmsBool OptimizeByResampling("
@@ -30,5 +30,20 @@ static void NexPdfEvalClut16(cmsContext ContextID, const cmsUInt16Number In[],
     print("Applied Little CMS typed pipeline callback patch")
 
 
+def patch_empty_bitmap() -> None:
+    source = Path(sys.argv[1]) / "source/fitz/font.c"
+    text = source.read_text(encoding="utf-8")
+    old = "bitmap->buffer + (bitmap->rows-1)*bitmap->pitch"
+    new = "(bitmap->buffer && bitmap->rows ? " + old + " : bitmap->buffer)"
+    if text.count(new) == 4 and text.count(old) == 4:
+        print("Empty font bitmap patch already applied")
+        return
+    if text.count(old) != 4 or new in text:
+        raise RuntimeError("MuPDF font source changed; review the empty bitmap patch before building")
+    source.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
+    print("Applied empty font bitmap pointer guard")
+
+
 if __name__ == "__main__":
-    main()
+    patch_cms()
+    patch_empty_bitmap()
