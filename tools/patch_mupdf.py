@@ -2,6 +2,7 @@
 """Apply the small regression-confirmed fixes to MuPDF's pinned source."""
 
 import sys
+import re
 from pathlib import Path
 
 
@@ -71,7 +72,23 @@ def patch_abandoned_redo() -> None:
     print("Applied commit-time redo invalidation patch")
 
 
+def patch_aes_shifts() -> None:
+    source = Path(sys.argv[1]) / "source/fitz/crypt-aes.c"
+    text = source.read_text(encoding="utf-8")
+    pattern = r"\( ([FR]Sb\[[^\n]+?\]) << 24 \)"
+    fixed = r"\( \(uint32_t\) [FR]Sb\[[^\n]+?\] << 24 \)"
+    if not re.search(pattern, text) and len(re.findall(fixed, text)) == 12:
+        print("AES unsigned shift patch already applied")
+        return
+    patched, count = re.subn(pattern, r"( (uint32_t) \1 << 24 )", text)
+    if count != 12 or re.search(fixed, text):
+        raise RuntimeError("MuPDF AES source changed; review the unsigned shift patch before building")
+    source.write_text(patched, encoding="utf-8", newline="\n")
+    print("Applied AES unsigned 24-bit shift patch")
+
+
 if __name__ == "__main__":
     patch_cms()
     patch_empty_bitmap()
     patch_abandoned_redo()
+    patch_aes_shifts()

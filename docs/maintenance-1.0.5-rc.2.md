@@ -18,7 +18,8 @@ Date: 2026-10-30. Baseline: `v1.0.5-rc.1`, commit
 “文件 → 使用所有者密码重新打开”允许免输用户密码的受限文件获得合法所有者访问，
 并保留保存/放弃/取消确认。错误密码或取消打开仍保留原会话。
 
-The journal fix is the third small patch in `tools/patch_mupdf.py`. It is applied
+The journal fix and unsigned AES shift fix join two earlier small patches in
+`tools/patch_mupdf.py`. All four are applied
 idempotently to Windows, Linux, macOS, sanitizer builds and the full source archive.
 The MuPDF submodule stays at 1.28.6 (`da5f5eb890d7b3fb76903160b5f7f48ba1301492`).
 Patch application rejects a changed source layout and must be reviewed on an engine upgrade.
@@ -30,7 +31,7 @@ Windows 11, Visual Studio 2022, Qt 6.11.2, existing MuPDF SDK/build directory re
 - Before repair: three unauthorized-operation rows and two UI regressions fail.
   A subsequent failure-recovery test additionally exposed lost redo history.
 - Final core Qt Test: **31 passed**, including initialization/cleanup and data rows;
-  UI Qt Test: **8 passed**. CTest **2/2**, **17.44 s**.
+  UI Qt Test: **8 passed**. CTest **2/2**, **16.55 s**, after the AES shift patch.
 - Six permission rows cover decrypt/re-encrypt/import with nonempty and empty user passwords,
   rejection without output/state changes, Keep saves and successful owner operations.
 - Failed import regression covers rollback from the original document and a saved edited
@@ -45,6 +46,14 @@ seed replay and bounded mutation fuzzing, so the journal fix is exercised under
 ASan/UBSan rather than only by the open/render fuzz harness. Three-platform CI and
 all four packaging jobs must pass before publishing; the matching commit/run links
 are retained on GitHub Actions and in the published release verification notes.
+
+The first expanded sanitizer run
+[41003525553](https://github.com/YDLuo-1/nexPDF/actions/runs/41003525553) stopped at
+`crypt-aes.c:228`: an AES substitution-table byte was promoted to signed `int`
+before shifting left by 24. The patch casts the 12 affected key/encode/decode
+expressions to `uint32_t` before shifting, preserving the intended AES bit pattern.
+Core UBSan now collects diagnostics across the suite and explicitly fails on any
+`runtime error:`; ASan remains fail-fast. No sanitizer category is suppressed.
 
 Local compact evidence: `out/second-pass-20261030` (ignored), with baseline/final
 test logs, build logs, fixture hash and release verification. Rebuildable downloads,
