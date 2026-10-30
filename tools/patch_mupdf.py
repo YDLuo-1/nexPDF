@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the small sanitizer-confirmed fixes to MuPDF's pinned source."""
+"""Apply the small regression-confirmed fixes to MuPDF's pinned source."""
 
 import sys
 from pathlib import Path
@@ -44,6 +44,34 @@ def patch_empty_bitmap() -> None:
     print("Applied empty font bitmap pointer guard")
 
 
+def patch_abandoned_redo() -> None:
+    source = Path(sys.argv[1]) / "source/pdf/pdf-object.c"
+    text = source.read_text(encoding="utf-8")
+    old = """\t\t/* We are about to add a fragment. Everything after 'current' in the
+\t\t * history must be thrown away. If current is NULL, then *everything*
+\t\t * must be thrown away. */
+\t\tdiscard_journal_entries(ctx, doc->journal->current ? &doc->journal->current->next : &doc->journal->head);
+
+"""
+    anchor = "\telse if (entry->title != NULL)\n"
+    commit = """\t/* nexPDF: retain redo until the outer operation commits successfully.
+\t * pdf_abandon_operation can then roll back without losing prior history. */
+\tif (entry && entry->head)
+\t\tdiscard_journal_entries(ctx, doc->journal->current ? &doc->journal->current->next : &doc->journal->head);
+
+"""
+    insertion = "\t/* We really ought to have just a single pending entry at this point,\n"
+    if old not in text and text.count(commit) == 1:
+        print("Abandoned-operation redo patch already applied")
+        return
+    if text.count(old) != 1 or text.count(insertion) != 1 or text.count(anchor) != 1 or commit in text:
+        raise RuntimeError("MuPDF journal source changed; review the abandoned-operation patch before building")
+    source.write_text(text.replace(old, "").replace(insertion, commit + insertion),
+                      encoding="utf-8", newline="\n")
+    print("Applied commit-time redo invalidation patch")
+
+
 if __name__ == "__main__":
     patch_cms()
     patch_empty_bitmap()
+    patch_abandoned_redo()

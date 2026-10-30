@@ -148,6 +148,9 @@ AppTranslator::AppTranslator(QObject *parent) : QTranslator(parent)
         {"Cancel", "取消"},
         {"Preparing print job…", "正在准备打印…"},
         {"This document does not grant copying permission.", "此文档未授予复制权限。"},
+        {"The source PDF does not grant copying permission.", "源 PDF 未授予复制权限。"},
+        {"Reopen with the owner password to change PDF security settings.", "请使用所有者密码重新打开 PDF，再更改安全设置。"},
+        {"Reopen with owner password…", "使用所有者密码重新打开…"},
         {"This document does not grant the requested printing permission.", "此文档未授予所请求的打印权限。"}
     };
     for (const auto &[english, chinese] : entries) {

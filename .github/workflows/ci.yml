@@ -259,8 +259,24 @@ jobs:
           cp third_party/mupdf/build/fuzz/libmupdf*.a "$RUNNER_TEMP/mupdf-fuzz/lib/"
           cmake -S . -B build/fuzz -G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" -DMUPDF_ROOT="$RUNNER_TEMP/mupdf-fuzz" \
-            -DNEXPDF_BUILD_APP=OFF -DNEXPDF_BUILD_TESTS=OFF -DNEXPDF_BUILD_FUZZERS=ON -DNEXPDF_ENABLE_SANITIZERS=ON
+            -DNEXPDF_BUILD_APP=OFF -DNEXPDF_BUILD_TESTS=ON -DNEXPDF_BUILD_FUZZERS=ON -DNEXPDF_ENABLE_SANITIZERS=ON
           cmake --build build/fuzz --parallel 3
+      - name: Run instrumented core regressions
+        shell: bash
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          mkdir -p "$RUNNER_TEMP/fuzz-results"
+          ctest --test-dir build/fuzz --output-on-failure --timeout 120
+      - name: Retain instrumented regression log
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/fuzz-results"
+          if [ -f build/fuzz/Testing/nexpdf-core-test.txt ]; then
+            cp build/fuzz/Testing/nexpdf-core-test.txt "$RUNNER_TEMP/fuzz-results/core-tests.txt"
+          fi
       - name: Run bounded fuzz smoke
         shell: bash
         env:

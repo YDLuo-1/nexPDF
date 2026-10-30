@@ -5,7 +5,9 @@
 #include <QDir>
 #include <QFile>
 #include <QLabel>
+#include <QInputDialog>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPrintDialog>
 #include <QPrinter>
 #include <QProgressDialog>
@@ -23,11 +25,11 @@
 
 namespace {
 
-QByteArray minimalPdf()
+QByteArray minimalPdf(const QByteArray &extra = {})
 {
     const QByteArray content =
         "BT /F1 28 Tf 72 680 Td (nexPDF UI smoke test) Tj "
-        "0 -48 Td /F1 16 Tf (Local PDF processing) Tj ET\n";
+        "0 -48 Td /F1 16 Tf (Local PDF processing) Tj ET\n" + extra;
     const QList<QByteArray> objects = {
         "<< /Type /Catalog /Pages 2 0 R >>",
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -66,10 +68,91 @@ class MainWindowTests final : public QObject {
     Q_OBJECT
 
 private slots:
+    void queuedEditRequiresDiscardConfirmation();
+    void zoomCancelsObsoleteRenders();
+    void reopensEmptyUserPdfAsOwner();
     void opensFixtureAndCapturesUi();
     void printActionOffersDialogForOpenDocument();
     void printsSelectedPagesAndCancels();
 };
+
+void MainWindowTests::queuedEditRequiresDiscardConfirmation()
+{
+    QTemporaryDir dir; QVERIFY(dir.isValid());
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, dir.path());
+    const QString path = dir.filePath(QStringLiteral("pending-edit.pdf"));
+    QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); file.write(minimalPdf()); file.close();
+    MainWindow window;
+    window.openFile(path);
+    QTRY_COMPARE(window.pageCount_, 1);
+    window.applyPageOperation(nexpdf::EditKind::InsertBlankPage);
+    bool prompted = false;
+    QTimer dismiss;
+    connect(&dismiss, &QTimer::timeout, &window, [&] {
+        if (auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
+            prompted = true;
+            box->button(QMessageBox::Cancel)->click();
+        }
+    });
+    dismiss.start(10);
+    const bool discard = window.confirmDiscard();
+    dismiss.stop();
+    QVERIFY2(!discard && prompted, "A queued edit was discarded without a save prompt");
+    QTRY_COMPARE(window.pageCount_, 2);
+}
+
+void MainWindowTests::zoomCancelsObsoleteRenders()
+{
+    QTemporaryDir dir; QVERIFY(dir.isValid());
+    QFile file(dir.filePath(QStringLiteral("slow-page.pdf")));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(minimalPdf(QByteArray("0 0 1 1 re f\n").repeated(200000))); file.close();
+    nexpdf::DocumentSession session;
+    QSignalSpy opened(&session, &nexpdf::DocumentSession::opened), rendered(&session, &nexpdf::DocumentSession::renderReady);
+    session.open(file.fileName()); QTRY_COMPARE(opened.size(), 1);
+    PdfCanvas canvas(&session);
+    canvas.setDocument(qvariant_cast<nexpdf::DocumentInfo>(opened.first().first()));
+    canvas.setWindowOpacity(0.0);
+    canvas.show();
+    QVERIFY(!canvas.visibleRegion().isEmpty());
+    QPixmap snapshot(canvas.size()); canvas.render(&snapshot);
+    canvas.setZoom(2.0);
+    canvas.hide();
+    QTRY_VERIFY_WITH_TIMEOUT(!rendered.isEmpty(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(std::any_of(rendered.cbegin(), rendered.cend(), [](const auto &event) {
+        return qvariant_cast<nexpdf::RenderResult>(event.first()).error.code == nexpdf::ErrorCode::Cancelled;
+    }), 10000);
+}
+
+void MainWindowTests::reopensEmptyUserPdfAsOwner()
+{
+    QTemporaryDir dir; QVERIFY(dir.isValid());
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, dir.path());
+    MainWindow window;
+    QSignalSpy opened(&window.session_, &nexpdf::DocumentSession::opened), saved(&window.session_, &nexpdf::DocumentSession::saved);
+    QVERIFY(!window.reopenOwnerAction_->isEnabled());
+    window.openFile(QFINDTESTDATA("fixtures/empty-user-restricted.pdf"));
+    QTRY_COMPARE(opened.size(), 1);
+    QVERIFY(!qvariant_cast<nexpdf::DocumentInfo>(opened.first().first()).canCopy);
+    QVERIFY(window.reopenOwnerAction_->isEnabled());
+    QTimer enterPassword;
+    connect(&enterPassword, &QTimer::timeout, &window, [&] {
+        if (auto *dialog = qobject_cast<QInputDialog *>(QApplication::activeModalWidget())) {
+            dialog->setTextValue(QStringLiteral("owner"));
+            dialog->accept();
+        }
+    });
+    enterPassword.start(10);
+    window.reopenOwnerAction_->trigger();
+    enterPassword.stop();
+    QTRY_COMPARE(opened.size(), 2);
+    QVERIFY(qvariant_cast<nexpdf::DocumentInfo>(opened.last().first()).canCopy);
+    nexpdf::SaveOptions options; options.encryption.algorithm = nexpdf::EncryptionAlgorithm::None;
+    window.session_.saveAs(dir.filePath(QStringLiteral("decrypted.pdf")), options);
+    QTRY_COMPARE(saved.size(), 1);
+}
 
 void MainWindowTests::opensFixtureAndCapturesUi()
 {

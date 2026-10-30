@@ -4,6 +4,14 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.5-rc.2] - 2026-10-30
+
+- Require owner authentication to decrypt or replace PDF security settings, and source copy permission to import pages. Explicit owner authentication also works for PDFs with an empty user password. / 解密或重设安全设置需要所有者权限，页面导入需要源 PDF 复制权限；空用户密码 PDF 也会正确检查显式所有者认证。
+- Add File → Reopen with owner password, preserving the save/discard confirmation. / 增加“文件 → 使用所有者密码重新打开”，保留未保存修改确认。
+- Include queued mutations in the unsaved-changes check so immediate close/open cannot silently discard an edit. / 未保存检查包含排队中的编辑，修复快速关闭或打开其他文件时漏掉保存提示。
+- Cancel obsolete canvas/thumbnail renders on invalidation and outside the viewport prefetch range. / 视图失效和滚出预取范围时取消过期页面、缩略图任务。
+- Preserve redo history when a partially applied edit fails; carry the small MuPDF journal patch in every build and corresponding-source archive. / 保留部分执行后失败编辑之前的重做历史，MuPDF 日志补丁统一进入构建和对应源码包。
+
 ## [1.0.5-rc.1] - 2026-10-30
 
 - Save from an independent PDF graph so encryption writes and failures cannot alter the live document or undo history; track the saved undo position across branches. / 从独立 PDF 对象图保存，避免加密写入和失败破坏当前文档与撤销历史；正确跟踪保存点和撤销分支。

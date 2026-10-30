@@ -23,7 +23,7 @@ OCR/Tesseract, curl/network loading, GLUT viewer, Office extraction, ZXing, and 
 
 ## Validation-only dependencies / 仅验证依赖
 
-`tools/patch_mupdf.py` applies two local fixes before every production/fuzz build and source archive: a typed Little CMS pipeline adapter in `cmsopt.c`, and a null/empty bitmap pointer guard in MuPDF `font.c`. It is idempotent and rejects unexpected source layouts; review/remove each fix when upstream incorporates it. No color transform, ICC or font support is disabled. Python 3.10+ is a build-only dependency. / 锁定源码包含 Little CMS 回调类型和 MuPDF 空字形位图指针运算两处修复，全部构建及完整源码包统一应用；上游吸收后应复核移除。
+`tools/patch_mupdf.py` applies three local fixes before every production/fuzz build and source archive: a typed Little CMS pipeline adapter in `cmsopt.c`, a null/empty bitmap pointer guard in MuPDF `font.c`, and commit-time redo invalidation in `pdf-object.c` so abandoned edits retain prior history. It is idempotent and rejects unexpected source layouts; review/remove each fix when upstream incorporates it. No color transform, ICC or font support is disabled. Python 3.10+ is a build-only dependency. / 锁定源码包含 Little CMS 回调类型、MuPDF 空字形位图指针运算、失败编辑保留重做历史三处修复，全部构建及完整源码包统一应用；上游吸收后应复核移除。
 
 - Qt Test is linked only by test/benchmark executables and is excluded from end-user packages. / Qt Test 仅由测试和基准程序链接，不进入最终用户包。
 - qpdf and Poppler are independent CI/developer validators. They are not linked into `nexPDF.exe`. / qpdf 与 Poppler 是 CI/开发独立校验器，不链接进 `nexPDF.exe`。

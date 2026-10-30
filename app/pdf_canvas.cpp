@@ -44,12 +44,8 @@ void PdfCanvas::setDocument(const nexpdf::DocumentInfo &info)
     currentPage_ = 0;
     pages_.clear();
     cache_.clear();
-    pending_.clear();
+    cancelPendingRenders();
     failedTiles_.clear();
-    requestKeys_.clear();
-    requestDensities_.clear();
-    outstandingRequests_.clear();
-    retriedRequests_.clear();
     searchHits_.clear();
     activeHit_ = -1;
     selectionRect_ = {};
@@ -65,12 +61,8 @@ void PdfCanvas::clearDocument()
     pageCount_ = 0;
     pages_.clear();
     cache_.clear();
-    pending_.clear();
+    cancelPendingRenders();
     failedTiles_.clear();
-    requestKeys_.clear();
-    requestDensities_.clear();
-    outstandingRequests_.clear();
-    retriedRequests_.clear();
     searchHits_.clear();
     activeHit_ = -1;
     selectionRect_ = {};
@@ -134,12 +126,8 @@ void PdfCanvas::setZoom(const qreal zoom)
     zoom_ = bounded;
     for (PageLayout &page : pages_) page.pixelSize = {};
     cache_.clear();
-    pending_.clear();
+    cancelPendingRenders();
     failedTiles_.clear();
-    requestKeys_.clear();
-    requestDensities_.clear();
-    outstandingRequests_.clear();
-    retriedRequests_.clear();
     rebuildLayout();
 }
 
@@ -152,12 +140,8 @@ void PdfCanvas::setRotation(const int rotation)
     rotation_ = value;
     for (PageLayout &page : pages_) page.pixelSize = {};
     cache_.clear();
-    pending_.clear();
+    cancelPendingRenders();
     failedTiles_.clear();
-    requestKeys_.clear();
-    requestDensities_.clear();
-    outstandingRequests_.clear();
-    retriedRequests_.clear();
     rebuildLayout();
 }
 
@@ -440,8 +424,20 @@ void PdfCanvas::rebuildLayout()
     update();
 }
 
+void PdfCanvas::cancelPendingRenders()
+{
+    for (auto it = outstandingRequests_.cbegin(); it != outstandingRequests_.cend(); ++it)
+        session_->cancelRender(it.key());
+    pending_.clear();
+    requestKeys_.clear();
+    requestDensities_.clear();
+    outstandingRequests_.clear();
+    retriedRequests_.clear();
+}
+
 void PdfCanvas::requestVisiblePages(const QRect &visible)
 {
+    QSet<QString> wanted;
     const int centerY = visible.center().y();
     int nearestPage = currentPage_;
     int nearestDistance = std::numeric_limits<int>::max();
@@ -466,6 +462,7 @@ void PdfCanvas::requestVisiblePages(const QRect &visible)
             for (int x = firstX; x <= pageVisible.right(); x += edge) {
                 const QPoint origin(x, y);
                 const QString key = cacheKey(index, origin);
+                wanted.insert(key);
                 if (cache_.contains(key) || pending_.contains(key) || failedTiles_.contains(key)) {
                     continue;
                 }
@@ -485,6 +482,16 @@ void PdfCanvas::requestVisiblePages(const QRect &visible)
                 session_->requestRender(request);
             }
         }
+    }
+    for (auto it = outstandingRequests_.begin(); it != outstandingRequests_.end();) {
+        const QString key = requestKeys_.value(it.key());
+        if (wanted.contains(key)) { ++it; continue; }
+        session_->cancelRender(it.key());
+        pending_.remove(key);
+        requestKeys_.remove(it.key());
+        requestDensities_.remove(it.key());
+        retriedRequests_.remove(it.key());
+        it = outstandingRequests_.erase(it);
     }
     if (nearestPage != currentPage_) {
         currentPage_ = nearestPage;

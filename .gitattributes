@@ -1,0 +1,2 @@
+# PDFs contain byte offsets and encrypted data; never rewrite their line endings.
+*.pdf binary

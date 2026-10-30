@@ -1,0 +1,60 @@
+# nexPDF 1.0.5-rc.2 second-pass acceptance
+
+Date: 2026-10-30. Baseline: `v1.0.5-rc.1`, commit
+`4a4f15e6b1f547de21850a9dd91618ac16437861`. Candidate identity is the immutable
+`v1.0.5-rc.2` tag. This round follows the [first maintenance report](maintenance-1.0.5.md).
+
+## Confirmed failures and repairs / 已确认问题与修复
+
+| Boundary | Reproduction | Repair |
+|---|---|---|
+| Security changes | A reader-password session saved plaintext or replaced encryption despite owner restrictions. | Core saving requires owner authentication for every explicit security change. Keep preserves existing security. |
+| Import permissions | A source denying copying was grafted into an unrestricted destination with its user password. | Authenticate the source, including explicit credentials when its user password is empty, and check copying before grafting. |
+| Immediate close/open | Queue Insert Blank Page, immediately call discard confirmation: no prompt appeared. | A synchronous pending-mutation count plus atomic modified state covers edits, watermarks, undo and redo before UI signals arrive. |
+| Obsolete rendering | Start slow-page tiles, change zoom: old requests completed without cancellation. | Cancel on zoom/rotation/document invalidation; prune canvas and thumbnail work outside prefetch bounds. |
+| Failed import history | Undo an edit, import page selection `{0, 99}` from a one-page source: the first page is rolled back, but redo is lost. | Defer MuPDF redo invalidation until the outer operation commits. Abandoned operations retain the previous history. |
+
+普通用户密码不得解密或重设安全设置；页面导入遵守源文档复制权限。
+“文件 → 使用所有者密码重新打开”允许免输用户密码的受限文件获得合法所有者访问，
+并保留保存/放弃/取消确认。错误密码或取消打开仍保留原会话。
+
+The journal fix is the third small patch in `tools/patch_mupdf.py`. It is applied
+idempotently to Windows, Linux, macOS, sanitizer builds and the full source archive.
+The MuPDF submodule stays at 1.28.6 (`da5f5eb890d7b3fb76903160b5f7f48ba1301492`).
+Patch application rejects a changed source layout and must be reviewed on an engine upgrade.
+
+## Verified locally / 本地实测
+
+Windows 11, Visual Studio 2022, Qt 6.11.2, existing MuPDF SDK/build directory reused.
+
+- Before repair: three unauthorized-operation rows and two UI regressions fail.
+  A subsequent failure-recovery test additionally exposed lost redo history.
+- Final core Qt Test: **31 passed**, including initialization/cleanup and data rows;
+  UI Qt Test: **8 passed**. CTest **2/2**, **17.44 s**.
+- Six permission rows cover decrypt/re-encrypt/import with nonempty and empty user passwords,
+  rejection without output/state changes, Keep saves and successful owner operations.
+- Failed import regression covers rollback from the original document and a saved edited
+  document, reopening the saved result and successfully redoing the earlier edit.
+- UI regression checks the immediate-close Cancel response, obsolete-render cancellation,
+  and menu-based owner reopening followed by decryption of an empty-user-password PDF.
+- Chinese translation coverage: **188 strings**, none missing. CI YAML parses.
+- DLL preflight preceded execution; all EXEs had explicit test timeouts.
+
+The Linux sanitizer job now runs the **full core regression suite** as well as
+seed replay and bounded mutation fuzzing, so the journal fix is exercised under
+ASan/UBSan rather than only by the open/render fuzz harness. Three-platform CI and
+all four packaging jobs must pass before publishing; the matching commit/run links
+are retained on GitHub Actions and in the published release verification notes.
+
+Local compact evidence: `out/second-pass-20261030` (ignored), with baseline/final
+test logs, build logs, fixture hash and release verification. Rebuildable downloads,
+fixture-generator binaries and package extraction are removed after validation.
+
+## Acceptance limits / 验收边界
+
+This is a focused second audit, not a proof that arbitrary PDFs are vulnerability-free.
+PDF permission flags rely on cooperating readers; they cannot prevent extraction by
+all other tools. Cancellation remains cooperative inside native rendering/parsing.
+No throughput improvement is claimed from this round's cancellation regression.
+Physical printers, macOS hardware and the complete high-DPI/input-method matrix still
+require acceptance. `v1.0.5-rc.2` remains a prerelease and does not replace stable Latest.

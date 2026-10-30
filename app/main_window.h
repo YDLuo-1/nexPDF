@@ -45,6 +45,7 @@ private:
     void retranslateUi();
     void openPath(const QString &path, const QString &password = {});
     void chooseOpen();
+    void reopenWithOwnerPassword();
     void saveAs(nexpdf::EncryptionAlgorithm mode = nexpdf::EncryptionAlgorithm::Keep);
     void printDocument();
     void createEncryptedCopy();
@@ -102,6 +103,7 @@ private:
     QPushButton *removeWatermarkButton_ = nullptr;
 
     QAction *openAction_ = nullptr;
+    QAction *reopenOwnerAction_ = nullptr;
     QAction *saveAsAction_ = nullptr;
     QAction *printAction_ = nullptr;
     QAction *encryptAction_ = nullptr;

@@ -147,6 +147,10 @@ class DocumentSessionTests final : public QObject {
     Q_OBJECT
 
 private slots:
+    void protectedExportsRequireAuthorization_data();
+    void protectedExportsRequireAuthorization();
+    void failedImportPreservesHistory_data();
+    void failedImportPreservesHistory();
     void opensRendersAndSearches();
     void undoAfterSaveMustBeDirty();
     void savePreservesRedoAndFailedSaveState();
@@ -265,6 +269,9 @@ void DocumentSessionTests::encryptsAndDecryptsWithValidation()
     QTRY_COMPARE_WITH_TIMEOUT(encryptedOpened.size(), 1, 5000);
 
     QSignalSpy decryptedSaved(&reader, &nexpdf::DocumentSession::saved);
+    password.password = QStringLiteral("owner-456");
+    reader.open(encryptedPath, password);
+    QTRY_COMPARE_WITH_TIMEOUT(encryptedOpened.size(), 2, 5000);
     nexpdf::SaveOptions decryption;
     decryption.encryption.algorithm = nexpdf::EncryptionAlgorithm::None;
     reader.saveAs(decryptedPath, decryption);
@@ -1180,6 +1187,129 @@ void DocumentSessionTests::replacesOpenSourceWithoutLosingUndo()
     QCOMPARE(qvariant_cast<nexpdf::DocumentInfo>(verified.first().first()).pageCount, 1);
     verify.extractText(0, QRectF(0, 0, 300, 400)); QTRY_COMPARE(text.size(), 1);
     QVERIFY(text.first().at(2).toString().contains(QStringLiteral("nexPDF")));
+}
+
+void DocumentSessionTests::protectedExportsRequireAuthorization_data()
+{
+    QTest::addColumn<int>("operation");
+    QTest::addColumn<bool>("emptyUserPassword");
+    QTest::newRow("decrypt") << 0 << false;
+    QTest::newRow("reencrypt") << 1 << false;
+    QTest::newRow("import-pages") << 2 << false;
+    QTest::newRow("empty-user-decrypt") << 0 << true;
+    QTest::newRow("empty-user-reencrypt") << 1 << true;
+    QTest::newRow("empty-user-import") << 2 << true;
+}
+
+void DocumentSessionTests::protectedExportsRequireAuthorization()
+{
+    QFETCH(int, operation);
+    QFETCH(bool, emptyUserPassword);
+    QTemporaryDir dir; QVERIFY(dir.isValid());
+    const QString input = writeFixture(dir.path());
+    const QString encrypted = dir.filePath(QStringLiteral("restricted.pdf"));
+    const QString output = dir.filePath(QStringLiteral("export.pdf"));
+    nexpdf::DocumentSession writer;
+    QSignalSpy opened(&writer, &nexpdf::DocumentSession::opened), saved(&writer, &nexpdf::DocumentSession::saved);
+    writer.open(input); QTRY_COMPARE(opened.size(), 1);
+    nexpdf::SaveOptions encryption;
+    encryption.encryption.algorithm = nexpdf::EncryptionAlgorithm::Aes256;
+    encryption.encryption.userPassword = QStringLiteral("reader");
+    encryption.encryption.ownerPassword = QStringLiteral("owner");
+    encryption.encryption.permissions.copy = false;
+    encryption.encryption.permissions.print = false;
+    if (emptyUserPassword) {
+        QVERIFY(QFile::copy(QFINDTESTDATA("fixtures/empty-user-restricted.pdf"), encrypted));
+    } else {
+        writer.saveAs(encrypted, encryption); QTRY_COMPARE(saved.size(), 1);
+    }
+
+    nexpdf::DocumentSession reader;
+    QSignalSpy ropen(&reader, &nexpdf::DocumentSession::opened), failed(&reader, &nexpdf::DocumentSession::failed),
+        exported(&reader, &nexpdf::DocumentSession::saved), states(&reader, &nexpdf::DocumentSession::stateChanged),
+        pageCounts(&reader, &nexpdf::DocumentSession::pageCountChanged);
+    nexpdf::OpenOptions auth;
+    if (!emptyUserPassword) auth.password = QStringLiteral("reader");
+    reader.open(operation == 2 ? input : encrypted, operation == 2 ? nexpdf::OpenOptions{} : auth);
+    QTRY_COMPARE(ropen.size(), 1);
+    QTRY_VERIFY(!states.isEmpty());
+    const auto before = states.size();
+    nexpdf::EditOperation import;
+    import.kind = nexpdf::EditKind::ImportPages;
+    import.sourcePath = encrypted; import.sourcePassword = auth.password;
+    nexpdf::SaveOptions options = encryption;
+    if (operation == 0) options.encryption.algorithm = nexpdf::EncryptionAlgorithm::None;
+    if (operation == 2) reader.applyEdit(import); else reader.saveAs(output, options);
+    QTRY_VERIFY(!failed.isEmpty() || !exported.isEmpty() || !pageCounts.isEmpty());
+    if (failed.isEmpty()) qInfo() << "Unauthorized operation succeeded:" << operation
+                                 << "saved:" << exported.size() << "page-count events:" << pageCounts.size();
+    QCOMPARE(failed.size(), 1);
+    QCOMPARE(qvariant_cast<nexpdf::OperationError>(failed.first().first()).code, nexpdf::ErrorCode::PermissionDenied);
+    QCOMPARE(states.size(), before);
+    QVERIFY(!QFileInfo::exists(output));
+
+    // Denied export must leave the session usable; an owner can perform the operation.
+    if (operation != 2) {
+        reader.saveAs(dir.filePath(QStringLiteral("keep.pdf"))); QTRY_COMPARE(exported.size(), 1);
+        auth.password = QStringLiteral("owner");
+        reader.open(encrypted, auth); QTRY_COMPARE(ropen.size(), 2);
+        reader.saveAs(output, options); QTRY_COMPARE(exported.size(), 2);
+    } else {
+        import.sourcePassword = QStringLiteral("owner");
+        reader.applyEdit(import); QTRY_VERIFY(states.size() > before);
+    }
+    QCOMPARE(failed.size(), 1);
+}
+
+void DocumentSessionTests::failedImportPreservesHistory_data()
+{
+    QTest::addColumn<bool>("hasPreviousEdit");
+    QTest::newRow("from-original") << false;
+    QTest::newRow("from-saved-edit") << true;
+}
+
+void DocumentSessionTests::failedImportPreservesHistory()
+{
+    QFETCH(bool, hasPreviousEdit);
+    QTemporaryDir dir; QVERIFY(dir.isValid());
+    const QString input = writeFixture(dir.path());
+    nexpdf::DocumentSession session;
+    QSignalSpy opened(&session, &nexpdf::DocumentSession::opened), states(&session, &nexpdf::DocumentSession::stateChanged),
+        failed(&session, &nexpdf::DocumentSession::failed), saved(&session, &nexpdf::DocumentSession::saved),
+        counts(&session, &nexpdf::DocumentSession::pageCountChanged);
+    session.open(input); QTRY_COMPARE(opened.size(), 1); QTRY_COMPARE(states.size(), 1);
+    QVERIFY(!session.hasUnsavedChanges());
+    nexpdf::EditOperation edit; edit.kind = nexpdf::EditKind::InsertBlankPage;
+    if (hasPreviousEdit) {
+        session.applyEdit(edit); QTRY_COMPARE(counts.size(), 1); QTRY_COMPARE(states.size(), 2);
+        session.saveAs(dir.filePath(QStringLiteral("baseline.pdf"))); QTRY_COMPARE(saved.size(), 1);
+        QTRY_VERIFY(!session.hasUnsavedChanges()); QTRY_COMPARE(states.size(), 3);
+    }
+    auto beforeState = states.size();
+    session.applyEdit(edit); QVERIFY(session.hasUnsavedChanges());
+    QTRY_COMPARE(states.size(), beforeState + 1);
+    session.undo(); QTRY_COMPARE(states.size(), beforeState + 2);
+    QTRY_VERIFY(!session.hasUnsavedChanges());
+    QVERIFY(states.last().at(3).toBool());
+    beforeState = states.size();
+    edit.kind = nexpdf::EditKind::ImportPages;
+    edit.sourcePath = input;
+    edit.sourcePages = {0, 99}; // Fail after one page has already been grafted.
+    session.applyEdit(edit); QTRY_COMPARE(failed.size(), 1);
+    QTRY_VERIFY(!session.hasUnsavedChanges());
+    QCOMPARE(states.size(), beforeState);
+    const QString output = dir.filePath(QStringLiteral("after-failure.pdf"));
+    const auto beforeSave = saved.size();
+    session.saveAs(output); QTRY_COMPARE(saved.size(), beforeSave + 1);
+    nexpdf::DocumentSession verification;
+    QSignalSpy verified(&verification, &nexpdf::DocumentSession::opened);
+    verification.open(output); QTRY_COMPARE(verified.size(), 1);
+    QCOMPARE(qvariant_cast<nexpdf::DocumentInfo>(verified.first().first()).pageCount, hasPreviousEdit ? 2 : 1);
+    const auto before = counts.size();
+    session.redo(); QTRY_VERIFY(counts.size() > before);
+    QCOMPARE(counts.last().first().toInt(), hasPreviousEdit ? 3 : 2);
+    QVERIFY(session.hasUnsavedChanges());
+    QCOMPARE(failed.size(), 1);
 }
 
 QTEST_MAIN(DocumentSessionTests)

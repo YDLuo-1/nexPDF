@@ -5,6 +5,8 @@
 #include <QObject>
 #include <QThread>
 
+#include <atomic>
+#include <functional>
 #include <memory>
 
 namespace nexpdf {
@@ -32,6 +34,8 @@ public:
     void saveAs(const QString &path, const SaveOptions &options = {});
     void undo();
     void redo();
+    // Includes mutations queued on the document worker, before stateChanged is delivered.
+    [[nodiscard]] bool hasUnsavedChanges() const;
 
 signals:
     void opened(const nexpdf::DocumentInfo &info);
@@ -48,7 +52,9 @@ signals:
     void failed(const nexpdf::OperationError &error);
 
 private:
+    void enqueueMutation(std::function<void()> mutation);
     class Impl;
+    std::atomic_uint pendingMutations_{0};
     std::unique_ptr<Impl> impl_;
     QObject *workerContext_ = nullptr;
     QThread documentThread_;

@@ -572,6 +572,8 @@ public:
 
     ~Impl() { closeDocument(false); }
 
+    bool isModified() const { return modified_.load(); }
+
     void initialize()
     {
         try {
@@ -603,7 +605,7 @@ public:
         fz_document *candidate = nullptr;
         fz_stream *candidateStream = nullptr;
         FILE *candidateFile = nullptr;
-        bool needsPassword = false;
+        int authentication = 0;
         bool encryptedDocument = false;
         bool incorrectPassword = false;
         int pageCount = 0;
@@ -618,7 +620,7 @@ public:
         fz_var(candidate);
         fz_var(candidateStream);
         fz_var(candidateFile);
-        fz_var(needsPassword);
+        fz_var(authentication);
         fz_var(encryptedDocument);
         fz_var(incorrectPassword);
         fz_var(pageCount);
@@ -639,9 +641,8 @@ public:
             }
             encryptedDocument = pdf_dict_get(
                 context, pdf_trailer(context, candidatePdf), PDF_NAME(Encrypt)) != nullptr;
-            needsPassword = fz_needs_password(context, candidate) != 0;
-            if ((needsPassword || !password.isEmpty())
-                && fz_authenticate_password(context, candidate, password.constData()) == 0) {
+            authentication = fz_authenticate_password(context, candidate, password.constData());
+            if (authentication == 0) {
                 incorrectPassword = true;
             } else {
                 pdf_disable_js(context, candidatePdf);
@@ -683,6 +684,8 @@ public:
         pdf_ = pdf_specifics(context, document_);
         path_ = file.absoluteFilePath();
         encrypted_ = encryptedDocument;
+        // MuPDF returns 1 for an unencrypted PDF, 2 for user and 4 for owner authentication.
+        canChangeSecurity_ = (authentication & (1 | 4)) != 0;
         password_ = password;
         signedDocument_ = signedDocument;
         signedSourcePath_ = signedDocument ? path_ : QString();
@@ -729,6 +732,7 @@ public:
         savedHistoryPosition_ = 0;
         pageCount_ = 0;
         encrypted_ = false;
+        canChangeSecurity_ = false;
         signedDocument_ = false;
         signedSourcePath_.clear();
         modified_ = false;
@@ -1064,6 +1068,7 @@ public:
         bool operationStarted = false;
         bool ok = false;
         bool ownsPageObject = false;
+        bool permissionDenied = false;
         int pageCountDelta = 0;
         const QByteArray title = QByteArrayLiteral("nexPDF edit");
         const QByteArray text = operation.text.toUtf8();
@@ -1114,6 +1119,7 @@ public:
         fz_var(operationStarted);
         fz_var(ok);
         fz_var(ownsPageObject);
+        fz_var(permissionDenied);
         fz_var(pageCountDelta);
 
         fz_try(context) {
@@ -1123,13 +1129,16 @@ public:
             switch (operation.kind) {
             case EditKind::ImportPages: {
                 sourceDocument = fz_open_document(context, sourcePath.constData());
-                if (fz_needs_password(context, sourceDocument)
-                    && fz_authenticate_password(context, sourceDocument, sourcePassword.constData()) == 0) {
+                if (fz_authenticate_password(context, sourceDocument, sourcePassword.constData()) == 0) {
                     fz_throw(context, FZ_ERROR_ARGUMENT, "The source PDF password is incorrect");
                 }
                 pdf_document *sourcePdf = pdf_specifics(context, sourceDocument);
                 if (sourcePdf == nullptr) {
                     fz_throw(context, FZ_ERROR_UNSUPPORTED, "Only PDF pages can be imported");
+                }
+                if (!fz_has_permission(context, sourceDocument, FZ_PERMISSION_COPY)) {
+                    permissionDenied = true;
+                    fz_throw(context, FZ_ERROR_ARGUMENT, "The source PDF does not grant copying permission");
                 }
                 const int sourceCount = fz_count_pages(context, sourceDocument);
                 graftMap = pdf_new_graft_map(context, pdf_);
@@ -1299,8 +1308,10 @@ public:
                 fz_try(context) { pdf_abandon_operation(context, pdf_); }
                 fz_catch(context) { /* Preserve the original error. */ }
             }
-            fail(ErrorCode::EngineError, QStringLiteral("edit"),
-                 tr("The edit could not be applied."), detail);
+            fail(permissionDenied ? ErrorCode::PermissionDenied : ErrorCode::EngineError,
+                 QStringLiteral("edit"), permissionDenied
+                    ? tr("The source PDF does not grant copying permission.")
+                    : tr("The edit could not be applied."), detail);
             return;
         }
 
@@ -2060,6 +2071,11 @@ public:
         if (!requirePdf(QStringLiteral("save"))) {
             return;
         }
+        if (requestedOptions.encryption.algorithm != EncryptionAlgorithm::Keep && !canChangeSecurity_) {
+            fail(ErrorCode::PermissionDenied, QStringLiteral("save"),
+                 tr("Reopen with the owner password to change PDF security settings."));
+            return;
+        }
         SaveOptions options = requestedOptions;
         if (options.encryption.algorithm == EncryptionAlgorithm::Keep) {
             options.encryption = savedEncryption_;
@@ -2534,7 +2550,8 @@ private:
     // Path of the signed source document. It stays set for the session so the
     // original signed file can never be overwritten by an edited copy.
     QString signedSourcePath_;
-    bool modified_ = false;
+    std::atomic_bool modified_{false};
+    bool canChangeSecurity_ = false;
     QVector<CandidateRecord> candidates_;
 };
 
@@ -2612,12 +2629,12 @@ void DocumentSession::extractText(const int pageIndex, const QRectF &bounds)
 
 void DocumentSession::applyEdit(const EditOperation &operation)
 {
-    QMetaObject::invokeMethod(workerContext_, [this, operation] { impl_->edit(operation); });
+    enqueueMutation([this, operation] { impl_->edit(operation); });
 }
 
 void DocumentSession::addWatermark(const WatermarkSpec &spec)
 {
-    QMetaObject::invokeMethod(workerContext_, [this, spec] { impl_->addWatermark(spec); });
+    enqueueMutation([this, spec] { impl_->addWatermark(spec); });
 }
 
 void DocumentSession::scanWatermarks()
@@ -2627,7 +2644,7 @@ void DocumentSession::scanWatermarks()
 
 void DocumentSession::removeWatermarks(const QStringList &candidateIds)
 {
-    QMetaObject::invokeMethod(workerContext_, [this, candidateIds] { impl_->removeWatermarks(candidateIds); });
+    enqueueMutation([this, candidateIds] { impl_->removeWatermarks(candidateIds); });
 }
 
 void DocumentSession::saveAs(const QString &path, const SaveOptions &options)
@@ -2637,12 +2654,28 @@ void DocumentSession::saveAs(const QString &path, const SaveOptions &options)
 
 void DocumentSession::undo()
 {
-    QMetaObject::invokeMethod(workerContext_, [this] { impl_->undo(); });
+    enqueueMutation([this] { impl_->undo(); });
 }
 
 void DocumentSession::redo()
 {
-    QMetaObject::invokeMethod(workerContext_, [this] { impl_->redo(); });
+    enqueueMutation([this] { impl_->redo(); });
+}
+
+void DocumentSession::enqueueMutation(std::function<void()> mutation)
+{
+    ++pendingMutations_;
+    if (!QMetaObject::invokeMethod(workerContext_, [this, mutation = std::move(mutation)] {
+        auto completed = qScopeGuard([this] { --pendingMutations_; });
+        mutation();
+    })) {
+        --pendingMutations_;
+    }
+}
+
+bool DocumentSession::hasUnsavedChanges() const
+{
+    return pendingMutations_.load() != 0 || impl_->isModified();
 }
 
 } // namespace nexpdf

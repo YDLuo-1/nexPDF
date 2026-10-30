@@ -380,6 +380,8 @@ void MainWindow::changeEvent(QEvent *event)
 
 void MainWindow::resetThumbnails()
 {
+    for (auto it = thumbnailRequests_.cbegin(); it != thumbnailRequests_.cend(); ++it)
+        session_.cancelRender(it.key());
     thumbnailRequests_.clear();
     thumbnailDensities_.clear();
     pendingThumbnailPages_.clear();
@@ -401,6 +403,13 @@ void MainWindow::requestVisibleThumbnails()
     if (last < 0) last = std::min(pageCount_ - 1, first + 12);
     first = std::max(0, first - 3);
     last = std::min(pageCount_ - 1, last + 3);
+    for (auto it = thumbnailRequests_.begin(); it != thumbnailRequests_.end();) {
+        if (it.value() >= first && it.value() <= last) { ++it; continue; }
+        session_.cancelRender(it.key());
+        thumbnailDensities_.remove(it.key());
+        pendingThumbnailPages_.remove(it.value());
+        it = thumbnailRequests_.erase(it);
+    }
     for (int page = first; page <= last; ++page) {
         QListWidgetItem *item = thumbnailList_->item(page);
         if (item == nullptr || !item->icon().isNull() || pendingThumbnailPages_.contains(page)) continue;
@@ -569,6 +578,7 @@ void MainWindow::buildUi()
 void MainWindow::buildMenus()
 {
     openAction_ = new QAction(this);
+    reopenOwnerAction_ = new QAction(this);
     saveAsAction_ = new QAction(this);
     printAction_ = new QAction(this);
     encryptAction_ = new QAction(this);
@@ -611,6 +621,7 @@ void MainWindow::buildMenus()
     using nexpdf::icons::Kind;
     using nexpdf::icons::actionIcon;
     openAction_->setIcon(actionIcon(Kind::Open));
+    reopenOwnerAction_->setIcon(actionIcon(Kind::Decrypt));
     saveAsAction_->setIcon(actionIcon(Kind::SaveAs));
     encryptAction_->setIcon(actionIcon(Kind::Encrypt));
     decryptAction_->setIcon(actionIcon(Kind::Decrypt));
@@ -684,6 +695,7 @@ void MainWindow::buildMenus()
     languageGroup->addAction(chineseAction_);
 
     connect(openAction_, &QAction::triggered, this, &MainWindow::chooseOpen);
+    connect(reopenOwnerAction_, &QAction::triggered, this, &MainWindow::reopenWithOwnerPassword);
     connect(saveAsAction_, &QAction::triggered, this, [this] { saveAs(); });
     connect(printAction_, &QAction::triggered, this, &MainWindow::printDocument);
     connect(encryptAction_, &QAction::triggered, this, &MainWindow::createEncryptedCopy);
@@ -745,7 +757,7 @@ void MainWindow::buildMenus()
 
     auto *fileMenu = menuBar()->addMenu(QString());
     fileMenu->setObjectName(QStringLiteral("fileMenu"));
-    fileMenu->addActions({openAction_, saveAsAction_, printAction_, encryptAction_, decryptAction_});
+    fileMenu->addActions({openAction_, reopenOwnerAction_, saveAsAction_, printAction_, encryptAction_, decryptAction_});
     fileMenu->addSeparator();
     fileMenu->addActions({closeAction_, exitAction_});
     auto *editMenu = menuBar()->addMenu(QString());
@@ -844,7 +856,7 @@ void MainWindow::buildMenus()
     addLabeledAction(editToolbar, applyRedactionsAction_, QStringLiteral("applyRedactionsToolButton"),
                      Qt::ToolButtonTextUnderIcon);
 
-    documentActions_ = {saveAsAction_, printAction_, encryptAction_, decryptAction_, closeAction_,
+    documentActions_ = {reopenOwnerAction_, saveAsAction_, printAction_, encryptAction_, decryptAction_, closeAction_,
                         insertPageAction_, importPagesAction_, deletePageAction_,
                         movePageUpAction_, movePageDownAction_, rotateLeftAction_, rotateRightAction_,
                         zoomInAction_, zoomOutAction_, actualSizeAction_, fitWidthAction_,
@@ -947,6 +959,7 @@ void MainWindow::buildToolPanel()
 void MainWindow::retranslateUi()
 {
     openAction_->setText(tr("Open…"));
+    reopenOwnerAction_->setText(tr("Reopen with owner password…"));
     saveAsAction_->setText(tr("Save As…"));
     printAction_->setText(tr("Print…"));
     encryptAction_->setText(tr("Create encrypted copy…"));
@@ -995,7 +1008,7 @@ void MainWindow::retranslateUi()
         action->setStatusTip(description);
     };
     const QList<QAction *> selfDescribingActions = {
-        openAction_, saveAsAction_, printAction_, encryptAction_, decryptAction_, undoAction_, redoAction_,
+        openAction_, reopenOwnerAction_, saveAsAction_, printAction_, encryptAction_, decryptAction_, undoAction_, redoAction_,
         insertPageAction_, importPagesAction_, deletePageAction_, movePageUpAction_, movePageDownAction_,
         rotateLeftAction_, rotateRightAction_, zoomInAction_, zoomOutAction_, actualSizeAction_,
         fitWidthAction_, eyeCareAction_, previousPageAction_, nextPageAction_, addTextAction_, addImageAction_, highlightAction_,
@@ -1081,6 +1094,21 @@ void MainWindow::chooseOpen()
     if (!confirmDiscard()) return;
     const QString path = QFileDialog::getOpenFileName(this, tr("Open PDF"), {}, tr("PDF files (*.pdf)"));
     if (!path.isEmpty()) openPath(path);
+}
+
+void MainWindow::reopenWithOwnerPassword()
+{
+    if (currentPath_.isEmpty() || !confirmDiscard()) return;
+    QInputDialog dialog(this);
+    dialog.setWindowTitle(tr("Reopen with owner password…"));
+    dialog.setLabelText(tr("Owner password"));
+    dialog.setTextEchoMode(QLineEdit::Password);
+    if (dialog.exec() != QDialog::Accepted) return;
+    nexpdf::OpenOptions options;
+    options.password = dialog.textValue();
+    dialog.setTextValue({});
+    saveReadingPosition();
+    session_.open(currentPath_, options);
 }
 
 void MainWindow::saveAs(const nexpdf::EncryptionAlgorithm mode)
@@ -1449,7 +1477,7 @@ void MainWindow::showError(const nexpdf::OperationError &error)
 
 bool MainWindow::confirmDiscard()
 {
-    if (!modified_) return true;
+    if (!session_.hasUnsavedChanges()) return true;
     const auto answer = QMessageBox::warning(this, tr("Save PDF"),
         tr("The document has unsaved changes."), QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
         QMessageBox::Save);

@@ -60,6 +60,7 @@ private:
     };
 
     void rebuildLayout();
+    void cancelPendingRenders();
     void requestVisiblePages(const QRect &visible);
     QString cacheKey(int pageIndex, const QPoint &tileOrigin) const;
     std::optional<int> pageAt(const QPoint &position) const;
