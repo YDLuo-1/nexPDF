@@ -19,14 +19,18 @@
 #include <QSet>
 #include <QScopeGuard>
 #include <QThreadPool>
+#include <QTimer>
 #include <QUuid>
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <QRunnable>
 #include <utility>
@@ -34,6 +38,8 @@
 #ifdef Q_OS_WIN
 #  define NOMINMAX
 #  include <windows.h>
+#  include <io.h>
+#  include <fcntl.h>
 #else
 #  include <cerrno>
 #  include <fcntl.h>
@@ -71,6 +77,60 @@ QString engineMessage(fz_context *context)
     const char *message = fz_caught_message(context);
     return message == nullptr ? QStringLiteral("Unknown MuPDF error")
                               : QString::fromUtf8(message);
+}
+
+#ifdef Q_OS_WIN
+FILE *openSharedSource(fz_context *context, const wchar_t *path)
+{
+    // Keep reading the old file after an atomic replacement, as POSIX readers do.
+    HANDLE handle = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE)
+        fz_throw(context, FZ_ERROR_SYSTEM, "Unable to open PDF (Windows error %lu)", GetLastError());
+    const int descriptor = _open_osfhandle(reinterpret_cast<intptr_t>(handle), _O_RDONLY | _O_BINARY);
+    if (descriptor < 0) {
+        CloseHandle(handle);
+        fz_throw(context, FZ_ERROR_SYSTEM, "Unable to create PDF file descriptor");
+    }
+    FILE *file = _fdopen(descriptor, "rb");
+    if (file == nullptr) {
+        _close(descriptor);
+        fz_throw(context, FZ_ERROR_SYSTEM, "Unable to create PDF input stream");
+    }
+    return file;
+}
+#endif
+
+// The writer mutates xrefs, encryption dictionaries and the undo journal.
+// Graft the complete reachable graph, including forms/outlines, into a disposable PDF.
+pdf_document *copyForSave(fz_context *context, pdf_document *source)
+{
+    pdf_document *copy = nullptr;
+    pdf_graft_map *map = nullptr;
+    fz_var(copy);
+    fz_var(map);
+    fz_try(context) {
+        copy = pdf_create_document(context);
+        copy->version = pdf_version(context, source);
+        map = pdf_new_graft_map(context, copy);
+        pdf_obj *trailer = pdf_trailer(context, source);
+        for (int i = 0; i < pdf_dict_len(context, trailer); ++i) {
+            pdf_obj *key = pdf_dict_get_key(context, trailer, i);
+            if (key == PDF_NAME(Size) || key == PDF_NAME(Prev) || key == PDF_NAME(XRefStm)
+                || key == PDF_NAME(Type) || key == PDF_NAME(W) || key == PDF_NAME(Index)
+                || key == PDF_NAME(Length) || key == PDF_NAME(Filter) || key == PDF_NAME(DecodeParms)) {
+                continue;
+            }
+            pdf_dict_put_drop(context, pdf_trailer(context, copy), key,
+                pdf_graft_mapped_object(context, map, pdf_dict_get_val(context, trailer, i)));
+        }
+    }
+    fz_always(context) { pdf_drop_graft_map(context, map); }
+    fz_catch(context) {
+        pdf_drop_document(context, copy);
+        fz_rethrow(context);
+    }
+    return copy;
 }
 
 fz_rect toFzRect(const QRectF &rect)
@@ -136,10 +196,35 @@ struct RawRenderOutput {
     char error[256]{};
 };
 
+struct RenderControl {
+    fz_cookie cookie{};
+    std::atomic_bool cancelled{false};
+    std::atomic_bool started{false};
+    std::chrono::steady_clock::time_point deadline;
+    void cancel()
+    {
+        cancelled.store(true);
+        // MuPDF explicitly supports setting abort from a controlling thread.
+        cookie.abort = 1;
+    }
+    bool shouldCancel()
+    {
+        if (std::chrono::steady_clock::now() >= deadline) cancel();
+        return cancelled.load();
+    }
+};
+
+void postRenderResult(QPointer<DocumentSession> owner, const RenderResult &result)
+{
+    if (owner) QMetaObject::invokeMethod(owner.data(), [owner, result] {
+        if (owner) emit owner->renderReady(result);
+    }, Qt::QueuedConnection);
+}
+
 bool renderDisplayList(fz_context *context, fz_display_list *displayList, const fz_rect bounds,
                        const double scale, const int rotation, const int requestedX,
                        const int requestedY, const int requestedWidth, const int requestedHeight,
-                       const int backgroundValue, RawRenderOutput *output)
+                       const int backgroundValue, fz_cookie *cookie, RawRenderOutput *output)
 {
     fz_pixmap *pixmap = nullptr;
     fz_device *device = nullptr;
@@ -151,7 +236,12 @@ bool renderDisplayList(fz_context *context, fz_display_list *displayList, const 
     fz_try(context) {
         const fz_matrix transform = fz_transform_page(
             bounds, static_cast<float>(72.0 * scale), static_cast<float>(rotation));
-        const fz_irect fullPixels = fz_round_rect(fz_transform_rect(bounds, transform));
+        const fz_rect pixels = fz_transform_rect(bounds, transform);
+        if (!std::isfinite(pixels.x1 - pixels.x0) || !std::isfinite(pixels.y1 - pixels.y0)
+            || pixels.x1 - pixels.x0 > 10000000 || pixels.y1 - pixels.y0 > 10000000) {
+            fz_throw(context, FZ_ERROR_LIMIT, "Page dimensions exceed the render limit");
+        }
+        const fz_irect fullPixels = fz_round_rect(pixels);
         output->pageWidth = fullPixels.x1 - fullPixels.x0;
         output->pageHeight = fullPixels.y1 - fullPixels.y0;
 
@@ -170,6 +260,9 @@ bool renderDisplayList(fz_context *context, fz_display_list *displayList, const 
         output->tileY = y0;
         output->tileWidth = x1 - x0;
         output->tileHeight = y1 - y0;
+        if (static_cast<int64_t>(output->tileWidth) * output->tileHeight > 32000000) {
+            fz_throw(context, FZ_ERROR_LIMIT, "Rendered image exceeds 32 million pixels; reduce resolution");
+        }
 
         const fz_irect tileBox = {
             fullPixels.x0 + x0, fullPixels.y0 + y0,
@@ -178,7 +271,7 @@ bool renderDisplayList(fz_context *context, fz_display_list *displayList, const 
         pixmap = fz_new_pixmap_with_bbox(context, fz_device_rgb(context), tileBox, nullptr, 0);
         fz_clear_pixmap_with_value(context, pixmap, backgroundValue);
         device = fz_new_draw_device_with_bbox(context, fz_identity, pixmap, &tileBox);
-        fz_run_display_list(context, displayList, device, transform, fz_infinite_rect, nullptr);
+        fz_run_display_list(context, displayList, device, transform, fz_infinite_rect, cookie);
         fz_close_device(context, device);
     }
     fz_always(context) {
@@ -209,8 +302,9 @@ QImage copyPixmap(fz_context *context, fz_pixmap *pixmap)
     const unsigned char *samples = fz_pixmap_samples(context, pixmap);
 
     QImage result(width, height, QImage::Format_RGB888);
+    if (result.isNull()) return {};
     for (int row = 0; row < height; ++row) {
-        std::memcpy(result.scanLine(row), samples + row * stride,
+        std::memcpy(result.scanLine(row), samples + static_cast<std::size_t>(row) * stride,
                     static_cast<std::size_t>(width) * 3U);
     }
     return result;
@@ -239,23 +333,32 @@ QImage makeTextWatermarkImage(const WatermarkSpec &spec)
     return source.transformed(transform, Qt::SmoothTransformation);
 }
 
-bool replaceAtomically(const QString &temporaryPath, const QString &targetPath, QString *detail)
+bool replaceAtomically(const QString &temporaryPath, const QString &targetPath,
+                       bool overwriteConfirmed, QString *detail)
 {
 #ifdef Q_OS_WIN
     const std::wstring source = QDir::toNativeSeparators(temporaryPath).toStdWString();
     const std::wstring target = QDir::toNativeSeparators(targetPath).toStdWString();
-    const DWORD flags = MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH;
-    if (MoveFileExW(source.c_str(), target.c_str(), flags) != 0) {
+    const DWORD flags = MOVEFILE_WRITE_THROUGH | (overwriteConfirmed ? MOVEFILE_REPLACE_EXISTING : 0);
+    const bool replacing = overwriteConfirmed && QFileInfo::exists(targetPath);
+    const BOOL replaced = replacing
+        ? ReplaceFileW(target.c_str(), source.c_str(), nullptr, 0, nullptr, nullptr)
+        : MoveFileExW(source.c_str(), target.c_str(), flags);
+    if (replaced != 0) {
         return true;
     }
     if (detail != nullptr) {
-        *detail = QStringLiteral("MoveFileExW failed with error %1").arg(GetLastError());
+        *detail = QStringLiteral("Atomic file replacement failed with Windows error %1").arg(GetLastError());
     }
     return false;
 #else
     const QByteArray source = QFile::encodeName(temporaryPath);
     const QByteArray target = QFile::encodeName(targetPath);
-    if (::rename(source.constData(), target.constData()) == 0) {
+    if (overwriteConfirmed && ::rename(source.constData(), target.constData()) == 0) {
+        return true;
+    }
+    if (!overwriteConfirmed && ::link(source.constData(), target.constData()) == 0) {
+        (void)::unlink(source.constData());
         return true;
     }
     if (detail != nullptr) {
@@ -402,74 +505,63 @@ enum pdf_annot_type annotationTypeFor(const EditKind kind)
 class DisplayListRenderTask final : public QRunnable {
 public:
     DisplayListRenderTask(QPointer<DocumentSession> owner, fz_context *context,
-                          fz_display_list *displayList, const fz_rect bounds,
-                          RenderRequest request, const quint64 revision)
-        : owner_(std::move(owner)), context_(context), displayList_(displayList),
-          bounds_(bounds), request_(std::move(request)), revision_(revision)
+                         fz_display_list *list, fz_rect bounds, RenderRequest request,
+                         quint64 revision, std::shared_ptr<RenderControl> control)
+        : owner_(owner), context_(context), displayList_(list), bounds_(bounds),
+          request_(std::move(request)), control_(std::move(control))
     {
+        result_.requestId = request_.requestId;
+        result_.revision = revision;
+        result_.pageIndex = request_.pageIndex;
+        result_.error = {ErrorCode::Cancelled, {}, {}, QStringLiteral("render")};
         setAutoDelete(true);
     }
 
-    ~DisplayListRenderTask() override { cleanup(); }
+    ~DisplayListRenderTask() override
+    {
+        // QThreadPool::clear also destroys queued jobs: every request gets a terminal result.
+        if (!completed_) postRenderResult(owner_, result_);
+        fz_drop_display_list(context_, displayList_);
+        fz_drop_context(context_);
+    }
 
     void run() override
     {
-        RenderResult result;
-        result.requestId = request_.requestId;
-        result.revision = revision_;
-        result.pageIndex = request_.pageIndex;
         RawRenderOutput raw;
-        const QRect requestedTile = request_.tilePixels;
-        const bool rendered = renderDisplayList(
-            context_, displayList_, bounds_, request_.scale,
-            normalizedRotation(request_.rotation), requestedTile.x(), requestedTile.y(),
-            requestedTile.width(), requestedTile.height(), request_.background.lightness(), &raw);
-        QString detail;
-        if (rendered) {
-            result.pagePixelSize = QSize(raw.pageWidth, raw.pageHeight);
-            result.tilePixels = QRect(raw.tileX, raw.tileY, raw.tileWidth, raw.tileHeight);
-            result.image = copyPixmap(context_, raw.pixmap);
-            fz_drop_pixmap(context_, raw.pixmap);
-        } else {
-            detail = QString::fromUtf8(raw.error);
+        const QRect tile = request_.tilePixels;
+        if (!control_->shouldCancel()) {
+            const bool rendered = renderDisplayList(context_, displayList_, bounds_, request_.scale,
+                normalizedRotation(request_.rotation), tile.x(), tile.y(), tile.width(), tile.height(),
+                request_.background.lightness(), &control_->cookie, &raw);
+            if (rendered) {
+                result_.pagePixelSize = QSize(raw.pageWidth, raw.pageHeight);
+                result_.tilePixels = QRect(raw.tileX, raw.tileY, raw.tileWidth, raw.tileHeight);
+                result_.image = copyPixmap(context_, raw.pixmap);
+                fz_drop_pixmap(context_, raw.pixmap);
+            }
+            result_.error = result_.image.isNull()
+                ? OperationError{ErrorCode::EngineError,
+                    QCoreApplication::translate("DocumentSession", "Unable to render the page."),
+                    QString::fromUtf8(raw.error), QStringLiteral("render")}
+                : OperationError{};
         }
-        cleanup();
-
-        const QPointer<DocumentSession> owner = owner_;
-        if (!owner) {
-            return;
+        if (control_->shouldCancel()) {
+            result_.image = {};
+            result_.error = {ErrorCode::Cancelled, {}, {}, QStringLiteral("render")};
         }
-        if (!rendered) {
-            OperationError error{ErrorCode::EngineError,
-                QCoreApplication::translate("DocumentSession", "Unable to render the page."),
-                detail, QStringLiteral("render")};
-            QMetaObject::invokeMethod(owner.data(), [owner, error] {
-                if (owner) emit owner->failed(error);
-            }, Qt::QueuedConnection);
-        } else {
-            QMetaObject::invokeMethod(owner.data(), [owner, result] {
-                if (owner) emit owner->renderReady(result);
-            }, Qt::QueuedConnection);
-        }
+        completed_ = true;
+        postRenderResult(owner_, result_);
     }
 
 private:
-    void cleanup()
-    {
-        if (context_ != nullptr) {
-            fz_drop_display_list(context_, displayList_);
-            fz_drop_context(context_);
-        }
-        context_ = nullptr;
-        displayList_ = nullptr;
-    }
-
     QPointer<DocumentSession> owner_;
     fz_context *context_ = nullptr;
     fz_display_list *displayList_ = nullptr;
     fz_rect bounds_{};
     RenderRequest request_;
-    quint64 revision_ = 0;
+    RenderResult result_;
+    std::shared_ptr<RenderControl> control_;
+    bool completed_ = false;
 };
 
 } // namespace
@@ -485,7 +577,7 @@ public:
         try {
             runtime_ = std::make_unique<detail::MuPdfRuntime>(kDefaultMuPdfStoreBytes);
             renderPool_.setObjectName(QStringLiteral("nexPDF render pool"));
-            renderPool_.setMaxThreadCount(std::max(1, QThread::idealThreadCount() - 1));
+            renderPool_.setMaxThreadCount(std::clamp(QThread::idealThreadCount() - 1, 1, 4));
         } catch (const std::exception &exception) {
             fail(ErrorCode::EngineError, QStringLiteral("initialize"),
                  tr("Unable to initialize the PDF engine."),
@@ -509,6 +601,8 @@ public:
 
         fz_context *context = runtime_->context();
         fz_document *candidate = nullptr;
+        fz_stream *candidateStream = nullptr;
+        FILE *candidateFile = nullptr;
         bool needsPassword = false;
         bool encryptedDocument = false;
         bool incorrectPassword = false;
@@ -516,9 +610,14 @@ public:
         bool signedDocument = false;
         char title[512]{};
         const QByteArray nativePath = QDir::toNativeSeparators(file.absoluteFilePath()).toUtf8();
+#ifdef Q_OS_WIN
+        const std::wstring widePath = QDir::toNativeSeparators(file.absoluteFilePath()).toStdWString();
+#endif
         QByteArray password = options.password.toUtf8();
         auto clearPassword = qScopeGuard([&password] { secureClear(password); });
         fz_var(candidate);
+        fz_var(candidateStream);
+        fz_var(candidateFile);
         fz_var(needsPassword);
         fz_var(encryptedDocument);
         fz_var(incorrectPassword);
@@ -527,7 +626,13 @@ public:
         fz_var(title);
 
         fz_try(context) {
+#ifdef Q_OS_WIN
+            candidateFile = openSharedSource(context, widePath.c_str());
+            candidateStream = fz_open_file_ptr_no_close(context, candidateFile);
+            candidate = fz_open_document_with_stream(context, "application/pdf", candidateStream);
+#else
             candidate = fz_open_document(context, nativePath.constData());
+#endif
             pdf_document *candidatePdf = pdf_specifics(context, candidate);
             if (candidatePdf == nullptr) {
                 fz_throw(context, FZ_ERROR_UNSUPPORTED, "nexPDF currently edits PDF documents only");
@@ -535,7 +640,8 @@ public:
             encryptedDocument = pdf_dict_get(
                 context, pdf_trailer(context, candidatePdf), PDF_NAME(Encrypt)) != nullptr;
             needsPassword = fz_needs_password(context, candidate) != 0;
-            if (needsPassword && fz_authenticate_password(context, candidate, password.constData()) == 0) {
+            if ((needsPassword || !password.isEmpty())
+                && fz_authenticate_password(context, candidate, password.constData()) == 0) {
                 incorrectPassword = true;
             } else {
                 pdf_disable_js(context, candidatePdf);
@@ -545,16 +651,19 @@ public:
                 pdf_enable_journal(context, candidatePdf);
             }
         }
+        fz_always(context) { fz_drop_stream(context, candidateStream); }
         fz_catch(context) {
             const QString detail = engineMessage(context);
             fz_drop_document(context, candidate);
+            if (candidateFile != nullptr) std::fclose(candidateFile);
             fail(ErrorCode::EngineError, QStringLiteral("open"),
                  tr("Unable to open the PDF."), detail);
             return;
         }
 
-        if (needsPassword && incorrectPassword) {
+        if (incorrectPassword) {
             fz_drop_document(context, candidate);
+            if (candidateFile != nullptr) std::fclose(candidateFile);
             if (password.isEmpty()) {
                 post([path](DocumentSession *owner) { emit owner->passwordRequired(path); });
             } else {
@@ -570,6 +679,7 @@ public:
         const QString fingerprint = computeFileFingerprint(file.absoluteFilePath());
         closeDocument(false);
         document_ = candidate;
+        sourceFile_.reset(candidateFile);
         pdf_ = pdf_specifics(context, document_);
         path_ = file.absoluteFilePath();
         encrypted_ = encryptedDocument;
@@ -591,6 +701,9 @@ public:
         info.signedDocument = signedDocument_;
         info.revision = revision_;
         info.fingerprint = fingerprint;
+        info.canCopy = fz_has_permission(context, document_, FZ_PERMISSION_COPY);
+        info.canPrint = fz_has_permission(context, document_, FZ_PERMISSION_PRINT);
+        info.canPrintHighQuality = fz_has_permission(context, document_, FZ_PERMISSION_PRINT_HQ);
         post([info](DocumentSession *owner) { emit owner->opened(info); });
         emitState();
     }
@@ -599,6 +712,7 @@ public:
     {
         ++searchGeneration_;
         activeSearch_.reset();
+        cancelRenders(false, true);
         renderPool_.clear();
         renderPool_.waitForDone();
         dropDisplayLists();
@@ -606,9 +720,13 @@ public:
             fz_drop_document(runtime_->context(), document_);
         }
         document_ = nullptr;
+        sourceFile_.reset();
         pdf_ = nullptr;
         path_.clear();
         secureClear(password_);
+        savedEncryption_ = {};
+        historyPosition_ = 0;
+        savedHistoryPosition_ = 0;
         pageCount_ = 0;
         encrypted_ = false;
         signedDocument_ = false;
@@ -620,29 +738,76 @@ public:
         }
     }
 
-    void render(const RenderRequest &request)
+    std::shared_ptr<RenderControl> registerRender(const RenderRequest &request)
     {
-        if (!requireDocument(QStringLiteral("render"))) {
+        auto control = std::make_shared<RenderControl>();
+        control->deadline = std::chrono::steady_clock::now()
+            + std::chrono::milliseconds(std::clamp(request.timeoutMs, 1, 60000));
+        std::lock_guard lock(renderMutex_);
+        if (auto previous = renderControls_.value(request.requestId).lock()) previous->cancel();
+        renderControls_.insert(request.requestId, control);
+        return control;
+    }
+
+    void cancelRender(quint64 id)
+    {
+        std::lock_guard lock(renderMutex_);
+        if (auto control = renderControls_.value(id).lock()) control->cancel();
+    }
+
+    void cancelRenders(bool expiredOnly = false, bool startedOnly = false)
+    {
+        std::lock_guard lock(renderMutex_);
+        const auto now = std::chrono::steady_clock::now();
+        for (auto it = renderControls_.begin(); it != renderControls_.end();) {
+            if (auto control = it.value().lock()) {
+                if ((!startedOnly || control->started.load())
+                    && (!expiredOnly || now >= control->deadline)) control->cancel();
+                ++it;
+            } else {
+                it = renderControls_.erase(it);
+            }
+        }
+    }
+
+    void render(const RenderRequest &request, std::shared_ptr<RenderControl> control)
+    {
+        control->started.store(true);
+        auto reject = [&](ErrorCode code, const QString &message, const QString &detail = {}) {
+            RenderResult result;
+            result.requestId = request.requestId;
+            result.revision = request.revision;
+            result.pageIndex = request.pageIndex;
+            result.error = {code, message, detail, QStringLiteral("render")};
+            postRenderResult(owner_, result);
+        };
+        if (control->shouldCancel() || (request.revision != 0 && request.revision != revision_)) {
+            reject(ErrorCode::Cancelled, {});
             return;
         }
-        if (request.revision != 0 && request.revision != revision_) {
+        if (document_ == nullptr || request.pageIndex < 0 || request.pageIndex >= pageCount_
+            || !std::isfinite(request.scale) || request.scale <= 0.0
+            || request.tilePixels.x() < 0 || request.tilePixels.y() < 0
+            || request.tilePixels.x() > 10000000 || request.tilePixels.y() > 10000000) {
+            reject(ErrorCode::InvalidArgument, tr("The render request is outside the document."));
             return;
         }
-        if (request.pageIndex < 0 || request.pageIndex >= pageCount_ || request.scale <= 0.0) {
-            fail(ErrorCode::InvalidArgument, QStringLiteral("render"),
-                 tr("The render request is outside the document."));
+        if (request.forPrinting && (!fz_has_permission(runtime_->context(), document_, FZ_PERMISSION_PRINT)
+            || (request.scale > 150.0 / 72.0
+                && !fz_has_permission(runtime_->context(), document_, FZ_PERMISSION_PRINT_HQ)))) {
+            reject(ErrorCode::PermissionDenied, tr("This document does not grant the requested printing permission."));
             return;
         }
-        if (!request.tilePixels.isEmpty()
-            && (request.tilePixels.width() > kMaximumTileEdge
-                || request.tilePixels.height() > kMaximumTileEdge)) {
-            fail(ErrorCode::InvalidArgument, QStringLiteral("render"),
-                 tr("A render tile cannot be larger than 1024 pixels per edge."));
+        if (!request.tilePixels.isNull()
+            && (request.tilePixels.width() <= 0 || request.tilePixels.height() <= 0
+                || request.tilePixels.width() > kMaximumTileEdge || request.tilePixels.height() > kMaximumTileEdge)) {
+            reject(ErrorCode::InvalidArgument, tr("A render tile cannot be larger than 1024 pixels per edge."));
             return;
         }
 
         fz_context *context = runtime_->context();
         fz_page *page = nullptr;
+        fz_device *device = nullptr;
         fz_display_list *list = displayLists_.value(request.pageIndex, nullptr);
         fz_display_list *jobList = nullptr;
         fz_context *jobContext = nullptr;
@@ -655,6 +820,7 @@ public:
             bounds = displayListBounds_.value(request.pageIndex);
         }
         fz_var(page);
+        fz_var(device);
         fz_var(list);
         fz_var(jobList);
         fz_var(jobContext);
@@ -665,8 +831,11 @@ public:
             if (list == nullptr) {
                 page = fz_load_page(context, document_, request.pageIndex);
                 bounds = fz_bound_page(context, page);
-                list = fz_new_display_list_from_page(context, page);
+                list = fz_new_display_list(context, bounds);
                 createdList = true;
+                device = fz_new_list_device(context, list);
+                fz_run_page(context, page, device, fz_identity, &control->cookie);
+                fz_close_device(context, device);
             }
             jobList = fz_keep_display_list(context, list);
             jobContext = fz_clone_context(context);
@@ -674,7 +843,7 @@ public:
                 fz_throw(context, FZ_ERROR_SYSTEM, "Unable to clone the MuPDF render context");
             }
         }
-        fz_always(context) { fz_drop_page(context, page); }
+        fz_always(context) { fz_drop_device(context, device); fz_drop_page(context, page); }
         fz_catch(context) {
             setupFailed = true;
             detail = engineMessage(context);
@@ -685,8 +854,14 @@ public:
             }
         }
         if (setupFailed) {
-            fail(ErrorCode::EngineError, QStringLiteral("render"),
-                 tr("Unable to render the page."), detail);
+            reject(ErrorCode::EngineError, tr("Unable to render the page."), detail);
+            return;
+        }
+        if (control->shouldCancel()) {
+            fz_drop_display_list(context, jobList);
+            fz_drop_context(jobContext);
+            if (createdList) fz_drop_display_list(context, list);
+            reject(ErrorCode::Cancelled, {});
             return;
         }
         if (createdList) {
@@ -695,7 +870,7 @@ public:
         }
         touchDisplayList(request.pageIndex);
         renderPool_.start(new DisplayListRenderTask(owner_, jobContext, jobList, bounds,
-                                                    request, revision_), request.priority);
+                                                    request, revision_, std::move(control)), request.priority);
     }
 
     // Search runs in slices posted back to the worker event loop so queued
@@ -733,6 +908,7 @@ public:
 
     void continueSearch()
     {
+        Q_ASSERT(QThread::currentThread() == &owner_->documentThread_);
         if (!activeSearch_.has_value()) {
             return;
         }
@@ -791,12 +967,17 @@ public:
             post([results](DocumentSession *owner) { emit owner->searchFinished(results); });
             return;
         }
-        QMetaObject::invokeMethod(owner_, [this] { continueSearch(); }, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(owner_->workerContext_, [this] { continueSearch(); }, Qt::QueuedConnection);
     }
 
     void extractText(const int pageIndex, const QRectF &bounds)
     {
         if (!requireDocument(QStringLiteral("extract-text"))) {
+            return;
+        }
+        if (!fz_has_permission(runtime_->context(), document_, FZ_PERMISSION_COPY)) {
+            fail(ErrorCode::PermissionDenied, QStringLiteral("extract-text"),
+                 tr("This document does not grant copying permission."));
             return;
         }
         if (pageIndex < 0 || pageIndex >= pageCount_ || bounds.isEmpty()) {
@@ -1543,6 +1724,7 @@ public:
                         record.annotationName = name;
                         record.annotationSubject = subject;
                         record.annotationIndex = annotationIndex;
+                        record.annotationObjectNumber = pdf_to_num(context, pdf_annot_obj(context, annot));
                         record.annotationType = type;
                         record.publicValue.bounds = toQRect(pdf_bound_annot(context, annot));
                         candidates_.append(std::move(record));
@@ -1683,8 +1865,14 @@ public:
                      tr("This watermark cannot be isolated safely."), id);
                 return;
             }
-            selected.append(*found);
+            if (std::none_of(selected.cbegin(), selected.cend(), [&id](const CandidateRecord &item) {
+                    return item.publicValue.id == id;
+                })) selected.append(*found);
         }
+        // Direct anonymous annotations have no object number; remove higher indices first.
+        std::stable_sort(selected.begin(), selected.end(), [](const CandidateRecord &a, const CandidateRecord &b) {
+            return a.annotationIndex > b.annotationIndex;
+        });
 
         fz_context *context = runtime_->context();
         bool operationStarted = false;
@@ -1800,7 +1988,10 @@ public:
                          annot = pdf_next_annot(context, annot), ++index) {
                         const QString name = QString::fromUtf8(pdf_annot_name(context, annot));
                         bool matches = false;
-                        if (!candidate.annotationName.isEmpty()) {
+                        if (!candidate.publicValue.createdByNexPDF && candidate.annotationObjectNumber > 0) {
+                            matches = pdf_to_num(context, pdf_annot_obj(context, annot))
+                                == candidate.annotationObjectNumber;
+                        } else if (candidate.publicValue.createdByNexPDF && !candidate.annotationName.isEmpty()) {
                             matches = name == candidate.annotationName;
                         } else if (index == candidate.annotationIndex) {
                             // Annotations without /NM can only be identified by
@@ -1864,10 +2055,14 @@ public:
         changed();
     }
 
-    void save(const QString &targetPath, const SaveOptions &options)
+    void save(const QString &targetPath, const SaveOptions &requestedOptions)
     {
         if (!requirePdf(QStringLiteral("save"))) {
             return;
+        }
+        SaveOptions options = requestedOptions;
+        if (options.encryption.algorithm == EncryptionAlgorithm::Keep) {
+            options.encryption = savedEncryption_;
         }
         const QFileInfo targetInfo(targetPath);
         if (targetInfo.fileName().isEmpty()) {
@@ -1876,8 +2071,17 @@ public:
             return;
         }
         const QString absoluteTarget = targetInfo.absoluteFilePath();
+        const auto resolvedPath = [](const QString &path) {
+            const QFileInfo file(path);
+            return file.exists() ? file.canonicalFilePath() : file.absoluteFilePath();
+        };
+#ifdef Q_OS_WIN
+        constexpr auto pathCase = Qt::CaseInsensitive;
+#else
+        constexpr auto pathCase = Qt::CaseSensitive;
+#endif
         if (!signedSourcePath_.isEmpty()
-            && QFileInfo(signedSourcePath_).absoluteFilePath() == absoluteTarget) {
+            && resolvedPath(signedSourcePath_).compare(resolvedPath(absoluteTarget), pathCase) == 0) {
             fail(ErrorCode::SignedDocumentRequiresSaveAs, QStringLiteral("save"),
                  tr("A signed PDF must be saved to a different file because editing invalidates signatures."));
             return;
@@ -1922,7 +2126,8 @@ public:
             + QUuid::createUuid().toString(QUuid::WithoutBraces)
             + QStringLiteral(".tmp");
         QFile temporary(temporaryPath);
-        if (!temporary.open(QIODevice::WriteOnly | QIODevice::NewOnly)) {
+        if (!temporary.open(QIODevice::WriteOnly | QIODevice::NewOnly,
+                            QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
             fail(ErrorCode::IoError, QStringLiteral("save"),
                  tr("A temporary file cannot be created beside the destination."),
                  temporary.errorString());
@@ -1934,7 +2139,6 @@ public:
         // it, so a multi-user POSIX host never exposes a readable copy.
         const QFile::Permissions existingPermissions = QFileInfo::exists(absoluteTarget)
             ? QFileInfo(absoluteTarget).permissions() : QFile::Permissions();
-        (void)temporary.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
 #endif
         auto removeTemporary = qScopeGuard([temporaryPath] {
             QFile::remove(temporaryPath);
@@ -1943,6 +2147,7 @@ public:
         fz_context *context = runtime_->context();
         QtOutputState state{&temporary};
         fz_output *output = nullptr;
+        pdf_document *copy = nullptr;
         pdf_write_options writeOptions{};
         auto clearWritePasswords = qScopeGuard([&writeOptions] {
             secureZero(writeOptions.upwd_utf8, sizeof(writeOptions.upwd_utf8));
@@ -1951,6 +2156,7 @@ public:
         bool writeFailed = false;
         QString detail;
         fz_var(output);
+        fz_var(copy);
         fz_try(context) {
             pdf_init_write_options(context, &writeOptions);
             writeOptions.do_garbage = options.garbageCollect ? 1 : 0;
@@ -1972,20 +2178,40 @@ public:
             output = fz_new_output(context, 64 * 1024, &state, writeQtOutput, closeQtOutput, nullptr);
             output->seek = seekQtOutput;
             output->tell = tellQtOutput;
-            pdf_write_document(context, pdf_, output, &writeOptions);
+            copy = copyForSave(context, pdf_);
+            // Keep can reuse the source key: all grafted streams are already loaded.
+            // Ownership remains with the live document and is detached before dropping copy.
+            copy->crypt = pdf_->crypt;
+            pdf_write_document(context, copy, output, &writeOptions);
             fz_close_output(context, output);
         }
-        fz_always(context) { fz_drop_output(context, output); }
+        fz_always(context) {
+            fz_drop_output(context, output);
+            if (copy != nullptr) copy->crypt = nullptr;
+            pdf_drop_document(context, copy);
+        }
         fz_catch(context) {
             writeFailed = true;
             detail = engineMessage(context);
         }
-        temporary.flush();
-#ifndef Q_OS_WIN
-        if (existingPermissions != QFile::Permissions()) {
-            (void)temporary.setPermissions(existingPermissions);
+        if (!temporary.flush()) {
+            writeFailed = true;
+            detail = temporary.errorString();
         }
-        (void)flushFileToDisk(temporary);
+#ifndef Q_OS_WIN
+        if (existingPermissions != QFile::Permissions() && !temporary.setPermissions(existingPermissions)) {
+            writeFailed = true;
+            detail = temporary.errorString();
+        }
+        if (!flushFileToDisk(temporary)) {
+            writeFailed = true;
+            detail = QString::fromLocal8Bit(std::strerror(errno));
+        }
+#else
+        if (!FlushFileBuffers(reinterpret_cast<HANDLE>(_get_osfhandle(temporary.handle())))) {
+            writeFailed = true;
+            detail = QStringLiteral("FlushFileBuffers failed with error %1").arg(GetLastError());
+        }
 #endif
         temporary.close();
         if (writeFailed) {
@@ -1999,7 +2225,7 @@ public:
         }
 
         QString replaceDetail;
-        if (!replaceAtomically(temporaryPath, absoluteTarget, &replaceDetail)) {
+        if (!replaceAtomically(temporaryPath, absoluteTarget, options.overwriteConfirmed, &replaceDetail)) {
             fail(ErrorCode::IoError, QStringLiteral("save"),
                  tr("The validated temporary file could not replace the destination."), replaceDetail);
             return;
@@ -2011,16 +2237,14 @@ public:
 
         path_ = absoluteTarget;
         modified_ = false;
+        savedHistoryPosition_ = historyPosition_;
         // The file just written is a fresh copy: any signature from the source
         // document no longer verifies, so further saves may target this path.
         signedDocument_ = false;
         const QString fingerprint = computeFileFingerprint(absoluteTarget);
         if (options.encryption.algorithm != EncryptionAlgorithm::Keep) {
             encrypted_ = options.encryption.algorithm != EncryptionAlgorithm::None;
-            secureClear(password_);
-            if (encrypted_) {
-                password_ = userPassword;
-            }
+            savedEncryption_ = options.encryption;
         }
         post([absoluteTarget, fingerprint](DocumentSession *owner) {
             emit owner->saved(absoluteTarget, fingerprint);
@@ -2082,6 +2306,7 @@ private:
         QString annotationName;
         QString annotationSubject;
         int annotationIndex = -1;
+        int annotationObjectNumber = 0;
         enum pdf_annot_type annotationType = PDF_ANNOT_UNKNOWN;
         bool contentStream = false;
         QString resourceBase;
@@ -2126,6 +2351,12 @@ private:
 
     void changed()
     {
+        ++searchGeneration_;
+        activeSearch_.reset();
+        if (savedHistoryPosition_ > historyPosition_) savedHistoryPosition_ = -1;
+        int steps = 0;
+        historyPosition_ = pdf_undoredo_state(runtime_->context(), pdf_, &steps);
+        cancelRenders(false, true);
         renderPool_.clear();
         dropDisplayLists();
         // Any content change invalidates previously scanned watermark records:
@@ -2148,6 +2379,9 @@ private:
 
     void historyChanged()
     {
+        ++searchGeneration_;
+        activeSearch_.reset();
+        cancelRenders(false, true);
         renderPool_.clear();
         dropDisplayLists();
         candidates_.clear();
@@ -2158,7 +2392,8 @@ private:
         fz_var(steps);
         fz_try(context) { position = pdf_undoredo_state(context, pdf_, &steps); }
         fz_catch(context) { position = 1; }
-        modified_ = position != 0;
+        historyPosition_ = position;
+        modified_ = position != savedHistoryPosition_;
         ++revision_;
         emitState();
     }
@@ -2221,8 +2456,8 @@ private:
                 fz_throw(context, FZ_ERROR_ARGUMENT, "Saved PDF password validation failed");
             }
             const int count = fz_count_pages(context, validation);
-            if (count <= 0) {
-                fz_throw(context, FZ_ERROR_FORMAT, "Saved PDF has no pages");
+            if (count <= 0 || count != pageCount_) {
+                fz_throw(context, FZ_ERROR_FORMAT, "Saved PDF page count does not match the document");
             }
             page = fz_load_page(context, validation, 0);
             fz_drop_page(context, page);
@@ -2279,13 +2514,19 @@ private:
     QPointer<DocumentSession> owner_;
     std::unique_ptr<detail::MuPdfRuntime> runtime_;
     QThreadPool renderPool_;
+    std::mutex renderMutex_;
+    QHash<quint64, std::weak_ptr<RenderControl>> renderControls_;
     QHash<int, fz_display_list *> displayLists_;
     QHash<int, fz_rect> displayListBounds_;
     QList<int> displayListLru_;
     fz_document *document_ = nullptr;
+    std::unique_ptr<FILE, decltype(&std::fclose)> sourceFile_{nullptr, &std::fclose};
     pdf_document *pdf_ = nullptr;
     QString path_;
     QByteArray password_;
+    EncryptionOptions savedEncryption_;
+    int historyPosition_ = 0;
+    int savedHistoryPosition_ = 0;
     int pageCount_ = 0;
     quint64 revision_ = 0;
     bool encrypted_ = false;
@@ -2315,6 +2556,9 @@ DocumentSession::DocumentSession(QObject *parent)
     workerContext_->moveToThread(&documentThread_);
     connect(&documentThread_, &QThread::finished,
             workerContext_, &QObject::deleteLater);
+    auto *renderTimer = new QTimer(this);
+    connect(renderTimer, &QTimer::timeout, this, [this] { impl_->cancelRenders(true); });
+    renderTimer->start(100);
     documentThread_.start();
     QMetaObject::invokeMethod(workerContext_, [this] { impl_->initialize(); },
                               Qt::BlockingQueuedConnection);
@@ -2322,6 +2566,7 @@ DocumentSession::DocumentSession(QObject *parent)
 
 DocumentSession::~DocumentSession()
 {
+    impl_->cancelRenders();
     if (documentThread_.isRunning()) {
         QMetaObject::invokeMethod(workerContext_, [this] { impl_->closeDocument(false); },
                                   Qt::BlockingQueuedConnection);
@@ -2339,12 +2584,19 @@ void DocumentSession::open(const QString &path, const OpenOptions &options)
 
 void DocumentSession::close()
 {
+    impl_->cancelRenders();
     QMetaObject::invokeMethod(workerContext_, [this] { impl_->closeDocument(); });
 }
 
 void DocumentSession::requestRender(const RenderRequest &request)
 {
-    QMetaObject::invokeMethod(workerContext_, [this, request] { impl_->render(request); });
+    auto control = impl_->registerRender(request);
+    QMetaObject::invokeMethod(workerContext_, [this, request, control] { impl_->render(request, control); });
+}
+
+void DocumentSession::cancelRender(quint64 requestId)
+{
+    impl_->cancelRender(requestId);
 }
 
 void DocumentSession::search(const QString &text)

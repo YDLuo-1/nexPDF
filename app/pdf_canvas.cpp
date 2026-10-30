@@ -45,6 +45,7 @@ void PdfCanvas::setDocument(const nexpdf::DocumentInfo &info)
     pages_.clear();
     cache_.clear();
     pending_.clear();
+    failedTiles_.clear();
     requestKeys_.clear();
     requestDensities_.clear();
     outstandingRequests_.clear();
@@ -65,6 +66,7 @@ void PdfCanvas::clearDocument()
     pages_.clear();
     cache_.clear();
     pending_.clear();
+    failedTiles_.clear();
     requestKeys_.clear();
     requestDensities_.clear();
     outstandingRequests_.clear();
@@ -133,6 +135,7 @@ void PdfCanvas::setZoom(const qreal zoom)
     for (PageLayout &page : pages_) page.pixelSize = {};
     cache_.clear();
     pending_.clear();
+    failedTiles_.clear();
     requestKeys_.clear();
     requestDensities_.clear();
     outstandingRequests_.clear();
@@ -150,6 +153,7 @@ void PdfCanvas::setRotation(const int rotation)
     for (PageLayout &page : pages_) page.pixelSize = {};
     cache_.clear();
     pending_.clear();
+    failedTiles_.clear();
     requestKeys_.clear();
     requestDensities_.clear();
     outstandingRequests_.clear();
@@ -252,7 +256,7 @@ void PdfCanvas::paintEvent(QPaintEvent *event)
         return;
     }
 
-    const QRect visible = visibleRegion().boundingRect().adjusted(0, -height(), 0, height());
+    const QRect visible = event->rect().intersected(visibleRegion().boundingRect());
     const int edge = tileEdge();
     for (int index = 0; index < pages_.size(); ++index) {
         const QRect pageRect = pages_[index].rect;
@@ -382,7 +386,8 @@ void PdfCanvas::acceptRender(const nexpdf::RenderResult &result)
     if (result.image.isNull()) {
         // Retry a transiently failed tile exactly once before giving up so a
         // hiccup does not leave a permanently blank region.
-        if (!retriedRequests_.contains(result.requestId) && outstandingRequests_.contains(result.requestId)) {
+        if (result.error.code == nexpdf::ErrorCode::EngineError
+            && !retriedRequests_.contains(result.requestId) && outstandingRequests_.contains(result.requestId)) {
             retriedRequests_.insert(result.requestId);
             session_->requestRender(outstandingRequests_.value(result.requestId));
             return;
@@ -392,6 +397,7 @@ void PdfCanvas::acceptRender(const nexpdf::RenderResult &result)
         outstandingRequests_.remove(result.requestId);
         retriedRequests_.remove(result.requestId);
         pending_.remove(key);
+        failedTiles_.insert(key);
         return;
     }
     requestKeys_.erase(request);
@@ -460,7 +466,7 @@ void PdfCanvas::requestVisiblePages(const QRect &visible)
             for (int x = firstX; x <= pageVisible.right(); x += edge) {
                 const QPoint origin(x, y);
                 const QString key = cacheKey(index, origin);
-                if (cache_.contains(key) || pending_.contains(key)) {
+                if (cache_.contains(key) || pending_.contains(key) || failedTiles_.contains(key)) {
                     continue;
                 }
                 pending_.insert(key);
@@ -468,7 +474,6 @@ void PdfCanvas::requestVisiblePages(const QRect &visible)
                 request.requestId = nextRequestId_++;
                 requestKeys_.insert(request.requestId, key);
                 requestDensities_.insert(request.requestId, density);
-                outstandingRequests_.insert(request.requestId, request);
                 request.revision = revision_;
                 request.pageIndex = index;
                 request.scale = zoom_ * density;
@@ -476,6 +481,7 @@ void PdfCanvas::requestVisiblePages(const QRect &visible)
                 request.tilePixels = QRect(qRound(origin.x() * density), qRound(origin.y() * density),
                                            renderedEdge, renderedEdge);
                 request.priority = pages_[index].rect.intersects(visible) ? 10 : 0;
+                outstandingRequests_.insert(request.requestId, request);
                 session_->requestRender(request);
             }
         }

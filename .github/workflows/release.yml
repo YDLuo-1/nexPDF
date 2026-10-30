@@ -78,6 +78,9 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "qpdf structure validation failed: $Path" }
           }
           Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/saved-graph.pdf"
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/repeated-save-plain-2.pdf"
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/repeated-save-plain-3.pdf"
           Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/edited.pdf"
           Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
           Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
@@ -214,6 +217,9 @@ jobs:
       - name: Independently validate generated PDFs
         run: |
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/saved-graph.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/repeated-save-plain-2.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/repeated-save-plain-3.pdf"
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/edited.pdf"
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
@@ -296,6 +302,9 @@ jobs:
       - name: Independently validate generated PDFs
         run: |
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/saved-graph.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/repeated-save-plain-2.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/repeated-save-plain-3.pdf"
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/edited.pdf"
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
@@ -336,7 +345,7 @@ jobs:
           submodules: recursive
       - name: Verify nested source and create archive
         run: |
-          test "$(git -C third_party/mupdf rev-parse HEAD)" = "fe374accd98a43174a328fa7980d7675e06d5b0d"
+          test "$(git -C third_party/mupdf rev-parse HEAD)" = "da5f5eb890d7b3fb76903160b5f7f48ba1301492"
           git -C third_party/mupdf submodule foreach --recursive 'test -n "$(git rev-parse HEAD)"'
           mkdir -p dist "nexPDF-$RELEASE_TAG"
           tar --exclude=.git --exclude=build --exclude=out --exclude=dist --exclude=.tools \

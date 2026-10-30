@@ -5,7 +5,7 @@
 - CMake 3.25+
 - C++20 compiler: MSVC 19.3+, GCC 13+, or Apple Clang 16+
 - Qt 6.11.2 exactly: Core, Gui, Widgets, Test (plus the Svg runtime plugin that `windeployqt` ships)
-- MuPDF 1.28.2 at commit `fe374accd98a43174a328fa7980d7675e06d5b0d`
+- MuPDF 1.28.6 at commit `da5f5eb890d7b3fb76903160b5f7f48ba1301492`
 - qpdf and Poppler are validation tools only, not runtime engines
 
 正式构建使用上述精确版本。`find_package(Qt6 ... EXACT)` 要求安装版本与 `NEXPDF_QT_VERSION` 完全一致；开发者可以把它改成机器上实际安装的精确版本做非发布编译检查，但这样的产物不得作为正式 Release。
@@ -37,7 +37,7 @@ Linux/macOS use the upstream Makefile with system libraries where practical and 
 cmake -S . -B build/release -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_PREFIX_PATH=/opt/Qt/6.11.2/gcc_64 \
-  -DMUPDF_ROOT=/opt/mupdf-1.28.2-slim
+  -DMUPDF_ROOT=/opt/mupdf-1.28.6-slim
 cmake --build build/release --parallel
 ctest --test-dir build/release --output-on-failure
 ```

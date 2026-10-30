@@ -15,7 +15,7 @@
 ```text
 app (Qt Widgets, interaction, language, cache)
   └── core (DocumentSession, domain types, safe operations)
-        └── MuPDF 1.28.2 (single production PDF engine)
+        └── MuPDF 1.28.6 (single production PDF engine)
 ```
 
 - `core/include/nexpdf/types.h`: the public v1 source-level types. No SDK/ABI stability promise is made for v1.0. / 公共源码类型；v1.0 不承诺 SDK/ABI 稳定。
@@ -27,13 +27,13 @@ app (Qt Widgets, interaction, language, cache)
 
 Public `DocumentSession` calls enqueue immutable value objects to a worker context on one `QThread`. Signals return implicitly shared Qt values to the UI thread. A MuPDF document/page/annotation pointer never crosses the thread boundary.
 
-`DocumentSession` creates and caches each page display list on the document thread, then sends retained display lists to a priority `QThreadPool`. Each render task owns a cloned MuPDF context and never touches the shared `fz_document`. Queued work is cleared on revision changes, stale results are discarded by request/revision identity, and close waits for running tasks before dropping the document. This preserves MuPDF's document-ownership rule while allowing independent tile rasterization in parallel.
+`DocumentSession` creates and caches each page display list on the document thread, then sends retained display lists to a priority `QThreadPool`. Each render task owns a cloned MuPDF context and never touches the shared `fz_document`. Every request returns one terminal RenderResult, including failures and cancellations. Render errors are carried by RenderResult.error, not the generic failed signal. A session timer requests cooperative MuPDF cookie cancellation at the request deadline (30 seconds by default); revision changes cancel old work, while later requests remain ordered on the document thread. At most four raster workers run, with a 32-million-pixel output limit. Close requests cancellation before waiting for running tasks. This preserves MuPDF's document-ownership rule while allowing independent tile rasterization in parallel.
 
-公共调用把不可变值对象排入单个 `QThread`；信号只把 Qt 隐式共享值返回 UI。`DocumentSession` 在文档线程创建并缓存页面 display list，再把持有引用的 display list 交给优先级 `QThreadPool`。每个渲染任务独占一个克隆的 MuPDF context，且不访问共享 `fz_document`。revision 变化会清理排队任务，过期结果按 request/revision 丢弃；关闭文档前等待正在执行的任务结束。
+公共调用把不可变值对象排入单个 `QThread`；信号只把 Qt 隐式共享值返回 UI。`DocumentSession` 在文档线程创建并缓存页面 display list，再把持有引用的 display list 交给优先级 `QThreadPool`。每个渲染任务独占一个克隆的 MuPDF context，且不访问共享 `fz_document`。每个请求均返回一次 RenderResult 终态，失败与取消通过 error 字段表达，不再使用通用 failed 信号。默认 30 秒期限由会话定时器发起 MuPDF cookie 协作取消；revision 变化取消旧任务，后续请求仍按文档线程顺序执行。栅格并发最多 4 个，单次输出不超过 3200 万像素；关闭前先请求取消再等待任务结束。
 
 ## Editing and undo / 编辑与撤销
 
-Each user-visible edit is wrapped in `pdf_begin_operation` / `pdf_end_operation`; failure calls `pdf_abandon_operation`. Undo/redo uses MuPDF journal state. Tool-created text and images are PDF annotations with stable `nexPDF:object:*` names, allowing move, resize, and deletion without pretending to support Word-style paragraph reflow.
+Each user-visible edit is wrapped in `pdf_begin_operation` / `pdf_end_operation`; failure calls `pdf_abandon_operation`. Undo/redo uses MuPDF journal state and a separate saved position; truncating a redo branch invalidates a saved position on that branch. Saving itself does not add a journal step. Tool-created text and images are PDF annotations with stable `nexPDF:object:*` names, allowing move, resize, and deletion without pretending to support Word-style paragraph reflow.
 
 每个用户编辑用 MuPDF operation 包裹，失败时回滚。文字和图片使用具有稳定 `nexPDF:object:*` 名称的 PDF 批注，支持移动、缩放和删除，但不宣称 Word 式段落重排或无损替换原字体。
 
@@ -46,12 +46,13 @@ Tool-created watermarks use one reusable Form XObject, an opacity ExtGState, and
 ## Save transaction / 保存事务
 
 ```text
-write sibling temporary file (owner-only on POSIX)
+graft a complete disposable PDF graph (including catalog and metadata)
+  → write sibling temporary file (owner-only at creation)
   → apply destination permissions
   → flush, fsync, and close
   → reopen with expected password
   → count pages and load first/last
-  → atomic replace (MoveFileExW or POSIX rename)
+  → atomic replace (ReplaceFileW / MoveFileExW or POSIX rename / exclusive link)
   → fsync the directory (POSIX)
   → report saved
 ```
@@ -59,3 +60,11 @@ write sibling temporary file (owner-only on POSIX)
 Overwrite requires an explicit UI confirmation. A crash or cancellation before the replace leaves the original target intact. The sibling temporary path is a UUID name opened with `QIODevice::NewOnly`; a scope guard removes it unless validation and replacement both succeed. On POSIX the temporary file starts as `0600` and inherits the destination's mode before the rename, so a decrypted edit is never world-readable.
 
 覆盖已有文件必须由界面二次确认。替换发生前崩溃或取消不会破坏原目标。临时文件使用目标目录中的 UUID 文件名并以 `QIODevice::NewOnly` 打开；只有校验和替换都成功时才解除作用域清理。POSIX 上临时文件以 `0600` 创建，并在替换前恢复目标文件原有权限，避免解密后的内容被同机其他用户读取。
+
+The live document and its journal are never passed to the mutating PDF writer. A disposable graph retains catalog, forms, outlines, metadata and shared references; save memory therefore includes this temporary graph. Keep uses the source encryption key until output encryption changes; after a successful change, session-owned SecurePassword values retain the requested encryption settings for subsequent saves and are wiped on close. A failed save never commits those settings. Windows source handles permit deletion-sharing so ReplaceFileW can replace the path while undo continues reading the original file data. New destinations are created without silently replacing a file that appeared after the initial existence check.
+
+保存时复制完整可达对象图供写入器使用，保留目录、表单、书签、元数据与共享引用，临时图会增加保存峰值内存。当前文档及 journal 不交给会修改对象的写入器。成功更改加密后，会话使用可清理的 SecurePassword 保存后续 Keep 所需设置，并在关闭时清除；失败保存不提交这些设置。Windows 源文件句柄允许共享删除，让原子替换后仍可读取旧数据完成撤销。对于原先不存在的目标，保存时不会静默覆盖在检查后才出现的文件。
+
+Cancellation is cooperative, not a process sandbox or a hard kill deadline. Native parsing, image decoding or driver calls that do not poll a cookie can still delay shutdown. Printing has its own bounded UI wait and document-revision cancellation; physical printer behavior still requires hardware acceptance.
+
+取消属于协作机制，不是进程沙箱或强制终止期限。不检查 cookie 的原生解析、图片解码和驱动调用仍可能延迟退出。打印另设界面等待超时及文档版本变化取消，实体打印行为仍须硬件验收。

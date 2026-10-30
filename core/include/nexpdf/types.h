@@ -57,7 +57,7 @@ public:
         if (!utf8.isEmpty()) {
             bytes_.assign(utf8.constData(), utf8.constData() + utf8.size());
             utf8.detach();
-            std::memset(utf8.data(), 0, static_cast<std::size_t>(utf8.size()));
+            erase(utf8.data(), static_cast<std::size_t>(utf8.size()));
         }
     }
     SecurePassword(const SecurePassword &other) : bytes_(other.bytes_) {}
@@ -93,12 +93,17 @@ public:
     void clear() noexcept { wipe(); }
 
 private:
+    static void erase(char *data, std::size_t size) noexcept
+    {
+        auto *byte = static_cast<volatile char *>(data);
+        while (size-- > 0) *byte++ = 0;
+    }
     void wipe() noexcept
     {
         if (bytes_.empty()) {
             return;
         }
-        std::memset(bytes_.data(), 0, bytes_.size());
+        erase(bytes_.data(), bytes_.size());
         bytes_.clear();
     }
 
@@ -180,6 +185,8 @@ struct RenderRequest {
     QRect tilePixels;
     QColor background = Qt::white;
     int priority = 0;
+    bool forPrinting = false;
+    int timeoutMs = 30000;
 };
 
 struct RenderResult {
@@ -189,6 +196,7 @@ struct RenderResult {
     QRect tilePixels;
     QSize pagePixelSize;
     QImage image;
+    OperationError error;
 };
 
 enum class WatermarkKind { Text, Image };
@@ -241,6 +249,9 @@ struct DocumentInfo {
     bool signedDocument = false;
     quint64 revision = 0;
     QString fingerprint;
+    bool canCopy = true;
+    bool canPrint = true;
+    bool canPrintHighQuality = true;
 };
 
 } // namespace nexpdf

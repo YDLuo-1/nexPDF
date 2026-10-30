@@ -21,6 +21,7 @@ class QScrollArea;
 class QSpinBox;
 class QPushButton;
 class PdfCanvas;
+class QPrinter;
 
 class MainWindow final : public QMainWindow {
     Q_OBJECT
@@ -36,6 +37,8 @@ protected:
     void changeEvent(QEvent *event) override;
 
 private:
+    friend class MainWindowTests;
+    bool printTo(QPrinter &printer, int timeoutMs = 30000);
     void buildUi();
     void buildMenus();
     void buildToolPanel();
@@ -161,5 +164,8 @@ private:
     int pendingObjectPage_ = -1;
     bool modified_ = false;
     bool signedDocument_ = false;
+    bool canPrint_ = true;
+    bool canPrintHighQuality_ = true;
+    bool printing_ = false;
     bool chinese_ = false;
 };

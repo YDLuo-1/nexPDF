@@ -1,27 +1,22 @@
 # Release checklist / 发布检查表
 
-A tag is not a formal release until every required item is checked with attached evidence. / 标签只有在所有必需项附带证据并通过后，才是正式 Release。
+## Current maintenance candidate / 当前维护候选版
 
-## Evidence status / 证据状态（2026-09-28）
+Target: `v1.0.5-rc.1`, Qt 6.11.2, MuPDF 1.28.6 (`da5f5eb890d7b3fb76903160b5f7f48ba1301492`). Evidence for this batch belongs in [maintenance-1.0.5.md](maintenance-1.0.5.md). / 本轮证据集中记录，旧版验收不自动算作新版通过。
 
-- Three-platform build, tests, qpdf/Poppler validation, and the no-JS/telemetry posture: covered by every green CI run on `main` (e.g. runs 36378197419–3638906xxxx) and the Release pipeline gates. / 三平台构建、测试、qpdf/Poppler 独立校验由每次 main 上的绿色 CI 与 Release 门槛覆盖。
-- Windows UI acceptance (high-DPI sharpness, search highlight, drag placement, reading position, damaged xref, AES-256 unlock, layers, transparency, large image, bilingual UI): agent-driven with screenshots, 2026-09-28. / Windows 界面验收由电脑控制完成并留存截图。
-- Measured performance: render P50 2.6 ms / P95 4.1 ms, throughput 330 pages/s, peak RSS 24 MiB; 50-cycle stability +0.6 MiB after warmup (100-page corpus, 1.5 density, 5000 pages, zero errors). / 性能与内存稳定性实测数据如左。
-- Package assets, digests, bilingual notes, and the AGPL source archive: verified on rc.7–rc.10. / 发布资产、摘要、双语说明与 AGPL 源码包在 rc.7–rc.10 实测验证。
-- Still open for formal v1.0.0: clean-VM smoke (setup.exe on a pristine machine), macOS DMG spot checks on real hardware, dedicated embedded-font corpus, and a measured print path once printing ships. Linux is covered: the rc.11 AppImage passed `--version` and a WSLg GUI check with CJK rendering on real Ubuntu 24.04 (2026-09-28, screenshot `out/linux-wslg-gui.png` locally). / 正式 v1.0.0 前仍待完成：干净虚拟机冒烟、macOS 实机抽查、嵌入式字体专用语料，以及未来打印功能的实测。Linux 已覆盖：rc.11 AppImage 在真实 Ubuntu 24.04 上通过 `--version` 与 WSLg 中文渲染检查（2026-09-28）。
-- Closed by v1.0.2 (2026-10-24, first stable, Latest): Windows installer full cycle (silent install → version → PROGID/RegisteredApplications/desktop shortcut → no-default-takeover → uninstall) verified on a clean GitHub runner and locally via the GUI wizard; Linux verified on real Ubuntu 24.04 + WSLg; performance and agent-driven UI acceptance recorded above. macOS shipped with CI-only evidence, honestly disclosed in the release notes. / v1.0.2（2026-10-24，首个正式版，Latest）关闭的门槛：Windows 安装器全周期在干净 runner 与本机 GUI 向导双重验证；Linux 在真实 Ubuntu 24.04 + WSLg 验证；性能与代理界面验收如上。macOS 以仅 CI 证据发布，已在发布说明如实披露。
+- [ ] Target commit passes Windows x64, Linux x86_64 and macOS Universal CI, including qpdf/Poppler checks. / 目标提交的三平台构建、测试与独立校验通过。
+- [ ] Instrumented Linux ASan/UBSan fuzz smoke builds and runs. / Linux 插桩 fuzz 构建及限时冒烟通过。
+- [x] Repeated AES-128/AES-256 saves, decryption, failed-save recovery, overwrite and saved undo branches pass. / 加解密连续保存、失败恢复、覆盖与撤销保存点回归通过。
+- [x] Search slices, anonymous watermark batches, permissions, render cancellation and QPrinter PDF output pass. / 搜索、水印、权限、渲染取消与打印到 PDF 回归通过。
+- [x] Same-corpus render/performance comparison and memory stability are recorded with limits. / 同语料性能与内存稳定性记录齐全并说明边界。
+- [ ] Notes exist, working tree is clean and CI passes before an immutable tag is created. / 标签前发布说明、干净工作树与准确提交的 CI 均满足。
+- [ ] Four packaging jobs pass; all five user assets exist with SHA-256 digests and measured sizes. / 四项打包全通过，五类附件及摘要、体积核验完成。
+- [x] Windows portable runtime smoke passes; no tests, benchmark or Qt6Test.dll are shipped. / Windows 部署冒烟通过，正式包排除开发测试运行库。
 
-- [ ] Exact Qt 6.11.2 and MuPDF 1.28.2 production build on Windows x64, Linux x86_64, and macOS Universal.
-- [ ] Unit/integration tests, qpdf `--warning-exit-0 --check`, Poppler reference rendering, and clean-machine smoke tests pass.
-- [ ] AES-128/AES-256, legacy RC4 read, Unicode passwords, empty-password rejection, wrong passwords, permissions, and decryption corpus pass.
-- [ ] Page operations, annotations, redaction, journal undo/redo, disk failure/cancel safety, and signature Save As gate pass.
-- [ ] nexPDF watermark add/remove render equivalence and external candidate false-positive corpus pass.
-- [ ] CJK, RTL, embedded fonts, transparency, layers, object streams, damaged xref, large images, and 100/300/1000-page corpus pass.
-- [ ] Measured P50/P95, throughput, peak RSS, error count, 50-cycle memory stability, mutool ratios, and package-size report are published.
-- [ ] High-DPI, Chinese IME, theme, scrollbar, focus/accessibility, and three-platform screenshots are reviewed.
-- [ ] Portable ZIP, unsigned setup.exe, AppImage, Universal DMG, full source, and bilingual notes exist; GitHub asset digests are visible for integrity checks.
-- [ ] `LICENSES/LGPL-3.0.txt` exists and is shipped in every binary package (`share/nexpdf` or `nexPDF.app/Contents/Resources`); stable tags are published only through a manual `workflow_dispatch`.
-- [ ] Source archive contains MuPDF and all nested dependency source required by AGPL corresponding-source obligations.
-- [ ] A clean VM runs `--version`, open, render, edit, save, reopen; unsigned-package warnings are visible in notes.
+This maintenance release remains a prerelease. Physical printer output, real macOS hardware and a complete high-DPI/IME/accessibility acceptance matrix have not been reaccepted by these automated tests. Cooperative native cancellation does not guarantee a hard shutdown deadline. / 本轮保持预发行版；实体打印、macOS 实机和完整高 DPI/输入法/无障碍矩阵不由自动测试替代，原生协作取消不保证硬性退出时限。
 
-中文检查范围与以上英文逐项相同：精确依赖版本、三平台构建、独立校验、加解密、编辑/涂黑、水印、复杂语料、性能和内存、界面截图、完整源码及发布资产，缺一不可。
+## Historical evidence / 历史证据
+
+The published v1.0.4 baseline is commit `f1ff6f2cc6df1c6e7f898eac698533e823e1accf`; CI run [40052792712](https://github.com/YDLuo-1/nexPDF/actions/runs/40052792712) and release run [40054308333](https://github.com/YDLuo-1/nexPDF/actions/runs/40054308333) passed. The October 29 audit nevertheless reproduced defects missed by that suite. A green older run is therefore not evidence for the new boundary cases.
+
+v1.0.2/v1.0.3 release notes retain their Windows installer, Linux/WSLg and embedded-font acceptance statements. The September 28 synthetic render figures (P50 2.6 ms, P95 4.1 ms, 330 pages/s, 50-cycle growth +0.6 MiB) are historical measurements, not current performance guarantees. macOS remained CI-only and v1.0.4 printing did not have physical-printer acceptance.

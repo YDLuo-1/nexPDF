@@ -1,10 +1,10 @@
 # Third-party notices / 第三方声明
 
-## MuPDF 1.28.2
+## MuPDF 1.28.6
 
 - Source: https://github.com/ArtifexSoftware/mupdf
 - License: GNU Affero General Public License v3 or later (commercial terms are separately available from Artifex)
-- nexPDF pins commit `fe374accd98a43174a328fa7980d7675e06d5b0d` and uses a slim build without OCR/Tesseract, curl, GLUT, DOCX/ODT extraction, or barcode components.
+- nexPDF pins commit `da5f5eb890d7b3fb76903160b5f7f48ba1301492` and uses a slim build without OCR/Tesseract, curl, GLUT, DOCX/ODT extraction, or barcode components.
 
 MuPDF embeds or links additional third-party codec, font, shaping, color, compression, HTML, and scripting libraries. Their license files are preserved in the complete `third_party/mupdf` source tree and must be included in source distributions.
 

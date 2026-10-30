@@ -22,6 +22,7 @@ public:
     void open(const QString &path, const OpenOptions &options = {});
     void close();
     void requestRender(const RenderRequest &request);
+    void cancelRender(quint64 requestId);
     void search(const QString &text);
     void extractText(int pageIndex, const QRectF &bounds);
     void applyEdit(const EditOperation &operation);

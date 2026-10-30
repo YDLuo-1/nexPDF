@@ -70,6 +70,7 @@ private:
     QVector<PageLayout> pages_;
     QCache<QString, QImage> cache_;
     QSet<QString> pending_;
+    QSet<QString> failedTiles_;
     QHash<quint64, QString> requestKeys_;
     QHash<quint64, qreal> requestDensities_;
     QHash<quint64, nexpdf::RenderRequest> outstandingRequests_;

@@ -4,6 +4,7 @@
 #include "nexpdf/document_session.h"
 
 #include <QCoreApplication>
+#include <QFile>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QThread>
@@ -12,7 +13,10 @@
 
 static QCoreApplication *ensureApplication()
 {
-    static QCoreApplication application(0, nullptr);
+    static int argc = 1;
+    static char name[] = "nexpdf_fuzz_open";
+    static char *argv[] = {name, nullptr};
+    static QCoreApplication application(argc, argv);
     return &application;
 }
 
@@ -38,8 +42,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     nexpdf::DocumentSession session;
     QSignalSpy opened(&session, &nexpdf::DocumentSession::opened);
     QSignalSpy failed(&session, &nexpdf::DocumentSession::failed);
+    QSignalSpy passwordRequired(&session, &nexpdf::DocumentSession::passwordRequired);
     session.open(path, nexpdf::OpenOptions{});
-    for (int spins = 0; opened.isEmpty() && failed.isEmpty() && spins < 100; ++spins) {
+    for (int spins = 0; opened.isEmpty() && failed.isEmpty() && passwordRequired.isEmpty() && spins < 100; ++spins) {
         opened.wait(10);
         QCoreApplication::processEvents();
     }
@@ -56,6 +61,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     request.requestId = 1;
     request.pageIndex = 0;
     request.scale = 1.0;
+    request.tilePixels = QRect(0, 0, 512, 512);
     session.requestRender(request);
     for (int spins = 0; rendered.isEmpty() && spins < 100; ++spins) {
         rendered.wait(10);

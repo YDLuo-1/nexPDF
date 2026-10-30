@@ -1,0 +1,1000 @@
+{
+  "baseline_commit": "f1ff6f2cc6df1c6e7f898eac698533e823e1accf",
+  "qt": "6.11.2",
+  "candidate_engine_commit": "da5f5eb890d7b3fb76903160b5f7f48ba1301492",
+  "measurements": {
+    "benchmark-baseline": {
+      "cycle_rss_mib": [
+        21.20703125,
+        21.6484375,
+        21.5546875
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "pages-100.pdf",
+          "open_ms": 17,
+          "pages": 100
+        },
+        {
+          "cycle": 1,
+          "file": "pages-300.pdf",
+          "open_ms": 23,
+          "pages": 300
+        },
+        {
+          "cycle": 1,
+          "file": "pages-1000.pdf",
+          "open_ms": 29,
+          "pages": 1000
+        },
+        {
+          "cycle": 2,
+          "file": "pages-100.pdf",
+          "open_ms": 4,
+          "pages": 100
+        },
+        {
+          "cycle": 2,
+          "file": "pages-300.pdf",
+          "open_ms": 3,
+          "pages": 300
+        },
+        {
+          "cycle": 2,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        },
+        {
+          "cycle": 3,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 3,
+          "file": "pages-300.pdf",
+          "open_ms": 1,
+          "pages": 300
+        },
+        {
+          "cycle": 3,
+          "file": "pages-1000.pdf",
+          "open_ms": 3,
+          "pages": 1000
+        }
+      ],
+      "elapsed_seconds": 15.327,
+      "errors": 0,
+      "final_rss_mib": 21.5546875,
+      "initial_rss_mib": 14.57421875,
+      "peak_rss_mib": 24.66015625,
+      "render_p50_ms": 3.2434,
+      "render_p95_ms": 4.7048,
+      "rendered_pages": 4200,
+      "rss_growth_after_warmup_mib": 0,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 3,
+      "stable_baseline_rss_mib": 21.5546875,
+      "throughput_pages_per_second": 274.0262282247015
+    },
+    "benchmark-current": {
+      "cycle_rss_mib": [
+        21.23828125,
+        21.70703125,
+        21.69921875
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 1,
+          "file": "pages-300.pdf",
+          "open_ms": 2,
+          "pages": 300
+        },
+        {
+          "cycle": 1,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        },
+        {
+          "cycle": 2,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 2,
+          "file": "pages-300.pdf",
+          "open_ms": 3,
+          "pages": 300
+        },
+        {
+          "cycle": 2,
+          "file": "pages-1000.pdf",
+          "open_ms": 3,
+          "pages": 1000
+        },
+        {
+          "cycle": 3,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 3,
+          "file": "pages-300.pdf",
+          "open_ms": 2,
+          "pages": 300
+        },
+        {
+          "cycle": 3,
+          "file": "pages-1000.pdf",
+          "open_ms": 3,
+          "pages": 1000
+        }
+      ],
+      "elapsed_seconds": 18.528,
+      "errors": 0,
+      "final_rss_mib": 21.69921875,
+      "initial_rss_mib": 14.625,
+      "peak_rss_mib": 24.8046875,
+      "render_p50_ms": 3.8483,
+      "render_p95_ms": 6.3337,
+      "rendered_pages": 4200,
+      "rss_growth_after_warmup_mib": 0,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 3,
+      "stable_baseline_rss_mib": 21.69921875,
+      "throughput_pages_per_second": 226.6839378238342
+    },
+    "benchmark-stability": {
+      "cycle_rss_mib": [
+        20.88671875,
+        21.01171875,
+        21,
+        20.953125,
+        21.04296875,
+        21.04296875,
+        21.05078125,
+        21.07421875,
+        21.046875,
+        21.09375,
+        21.12109375,
+        21.10546875,
+        21.1328125,
+        21.11328125,
+        21.125,
+        21.10546875,
+        21.1875,
+        21.10546875,
+        21.1953125,
+        21.1953125,
+        21.4765625,
+        21.50390625,
+        21.453125,
+        21.48046875,
+        21.4609375,
+        21.3671875,
+        21.4765625,
+        21.44140625,
+        21.48828125,
+        21.45703125,
+        21.484375,
+        21.46484375,
+        21.4296875,
+        21.6171875,
+        21.47265625,
+        21.51171875,
+        21.5625,
+        21.56640625,
+        21.60546875,
+        21.5390625,
+        21.65625,
+        21.6484375,
+        21.57421875,
+        21.62109375,
+        21.59375,
+        21.625,
+        21.58984375,
+        21.62890625,
+        21.59375,
+        21.64453125
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 2,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 3,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 4,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 5,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 6,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 7,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 8,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 9,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 10,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 11,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 12,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 13,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 14,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 15,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 16,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 17,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 18,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 19,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 20,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 21,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 22,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 23,
+          "file": "pages-100.pdf",
+          "open_ms": 4,
+          "pages": 100
+        },
+        {
+          "cycle": 24,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 25,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 26,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 27,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 28,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 29,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 30,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 31,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 32,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 33,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 34,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 35,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 36,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 37,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 38,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 39,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 40,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 41,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 42,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 43,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 44,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 45,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 46,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 47,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 48,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 49,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 50,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        }
+      ],
+      "elapsed_seconds": 19.551,
+      "errors": 0,
+      "final_rss_mib": 21.64453125,
+      "initial_rss_mib": 14.6171875,
+      "peak_rss_mib": 23.2265625,
+      "render_p50_ms": 3.4542,
+      "render_p95_ms": 5.5149,
+      "rendered_pages": 5000,
+      "rss_growth_after_warmup_mib": 0.6015625,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 5,
+      "stable_baseline_rss_mib": 21.04296875,
+      "throughput_pages_per_second": 255.74139430208174
+    },
+    "benchmark-complex": {
+      "cycle_rss_mib": [
+        24.78125
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "cjk-text.pdf",
+          "open_ms": 13,
+          "pages": 3
+        },
+        {
+          "cycle": 1,
+          "file": "damaged-xref.pdf",
+          "open_ms": 45,
+          "pages": 3
+        },
+        {
+          "cycle": 1,
+          "file": "embedded-fonts.pdf",
+          "open_ms": 10,
+          "pages": 1
+        },
+        {
+          "cycle": 1,
+          "file": "large-image.pdf",
+          "open_ms": 19,
+          "pages": 2
+        },
+        {
+          "cycle": 1,
+          "file": "object-streams.pdf",
+          "open_ms": 13,
+          "pages": 3
+        },
+        {
+          "cycle": 1,
+          "file": "optional-layers.pdf",
+          "open_ms": 11,
+          "pages": 1
+        },
+        {
+          "cycle": 1,
+          "file": "rtl-hebrew-arabic.pdf",
+          "open_ms": 16,
+          "pages": 1
+        },
+        {
+          "cycle": 1,
+          "file": "transparency.pdf",
+          "open_ms": 14,
+          "pages": 1
+        }
+      ],
+      "elapsed_seconds": 0.285,
+      "errors": 0,
+      "final_rss_mib": 24.78125,
+      "initial_rss_mib": 14.6015625,
+      "peak_rss_mib": 25.86328125,
+      "render_p50_ms": 6.8927,
+      "render_p95_ms": 28.2944,
+      "rendered_pages": 15,
+      "rss_growth_after_warmup_mib": 0,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 1,
+      "stable_baseline_rss_mib": 24.78125,
+      "throughput_pages_per_second": 52.631578947368425
+    },
+    "crossover-1-A": {
+      "cycle_rss_mib": [
+        21.171875,
+        21.90234375
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 1,
+          "file": "pages-300.pdf",
+          "open_ms": 2,
+          "pages": 300
+        },
+        {
+          "cycle": 1,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        },
+        {
+          "cycle": 2,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 2,
+          "file": "pages-300.pdf",
+          "open_ms": 1,
+          "pages": 300
+        },
+        {
+          "cycle": 2,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        }
+      ],
+      "elapsed_seconds": 9.051,
+      "errors": 0,
+      "final_rss_mib": 21.90234375,
+      "initial_rss_mib": 14.54296875,
+      "peak_rss_mib": 24.77734375,
+      "render_p50_ms": 2.9881,
+      "render_p95_ms": 3.8671,
+      "rendered_pages": 2800,
+      "rss_growth_after_warmup_mib": 0,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 2,
+      "stable_baseline_rss_mib": 21.90234375,
+      "throughput_pages_per_second": 309.3580819798917
+    },
+    "crossover-2-B": {
+      "cycle_rss_mib": [
+        21.3125,
+        21.89453125
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "pages-100.pdf",
+          "open_ms": 4,
+          "pages": 100
+        },
+        {
+          "cycle": 1,
+          "file": "pages-300.pdf",
+          "open_ms": 3,
+          "pages": 300
+        },
+        {
+          "cycle": 1,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        },
+        {
+          "cycle": 2,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 2,
+          "file": "pages-300.pdf",
+          "open_ms": 3,
+          "pages": 300
+        },
+        {
+          "cycle": 2,
+          "file": "pages-1000.pdf",
+          "open_ms": 3,
+          "pages": 1000
+        }
+      ],
+      "elapsed_seconds": 13.127,
+      "errors": 0,
+      "final_rss_mib": 21.89453125,
+      "initial_rss_mib": 14.5703125,
+      "peak_rss_mib": 24.73046875,
+      "render_p50_ms": 4.1015,
+      "render_p95_ms": 7.3759,
+      "rendered_pages": 2800,
+      "rss_growth_after_warmup_mib": 0,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 2,
+      "stable_baseline_rss_mib": 21.89453125,
+      "throughput_pages_per_second": 213.300830349661
+    },
+    "crossover-3-C": {
+      "cycle_rss_mib": [
+        21.17578125,
+        21.7421875
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 1,
+          "file": "pages-300.pdf",
+          "open_ms": 1,
+          "pages": 300
+        },
+        {
+          "cycle": 1,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        },
+        {
+          "cycle": 2,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 2,
+          "file": "pages-300.pdf",
+          "open_ms": 2,
+          "pages": 300
+        },
+        {
+          "cycle": 2,
+          "file": "pages-1000.pdf",
+          "open_ms": 3,
+          "pages": 1000
+        }
+      ],
+      "elapsed_seconds": 10.006,
+      "errors": 0,
+      "final_rss_mib": 21.7421875,
+      "initial_rss_mib": 14.62890625,
+      "peak_rss_mib": 24.640625,
+      "render_p50_ms": 3.1428,
+      "render_p95_ms": 5.192,
+      "rendered_pages": 2800,
+      "rss_growth_after_warmup_mib": 0,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 2,
+      "stable_baseline_rss_mib": 21.7421875,
+      "throughput_pages_per_second": 279.83210073955627
+    },
+    "crossover-4-C": {
+      "cycle_rss_mib": [
+        21.23046875,
+        21.59375
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 1,
+          "file": "pages-300.pdf",
+          "open_ms": 1,
+          "pages": 300
+        },
+        {
+          "cycle": 1,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        },
+        {
+          "cycle": 2,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 2,
+          "file": "pages-300.pdf",
+          "open_ms": 1,
+          "pages": 300
+        },
+        {
+          "cycle": 2,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        }
+      ],
+      "elapsed_seconds": 8.08,
+      "errors": 0,
+      "final_rss_mib": 21.59375,
+      "initial_rss_mib": 14.625,
+      "peak_rss_mib": 24.62890625,
+      "render_p50_ms": 2.6167,
+      "render_p95_ms": 3.6478,
+      "rendered_pages": 2800,
+      "rss_growth_after_warmup_mib": 0,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 2,
+      "stable_baseline_rss_mib": 21.59375,
+      "throughput_pages_per_second": 346.53465346534654
+    },
+    "crossover-5-B": {
+      "cycle_rss_mib": [
+        21.3515625,
+        21.734375
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 1,
+          "file": "pages-300.pdf",
+          "open_ms": 2,
+          "pages": 300
+        },
+        {
+          "cycle": 1,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        },
+        {
+          "cycle": 2,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 2,
+          "file": "pages-300.pdf",
+          "open_ms": 3,
+          "pages": 300
+        },
+        {
+          "cycle": 2,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        }
+      ],
+      "elapsed_seconds": 9.452,
+      "errors": 0,
+      "final_rss_mib": 21.734375,
+      "initial_rss_mib": 14.5703125,
+      "peak_rss_mib": 24.63671875,
+      "render_p50_ms": 2.8023,
+      "render_p95_ms": 5.1829,
+      "rendered_pages": 2800,
+      "rss_growth_after_warmup_mib": 0,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 2,
+      "stable_baseline_rss_mib": 21.734375,
+      "throughput_pages_per_second": 296.23360135421075
+    },
+    "crossover-6-A": {
+      "cycle_rss_mib": [
+        21.3359375,
+        21.78515625
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 1,
+          "file": "pages-300.pdf",
+          "open_ms": 2,
+          "pages": 300
+        },
+        {
+          "cycle": 1,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        },
+        {
+          "cycle": 2,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 2,
+          "file": "pages-300.pdf",
+          "open_ms": 3,
+          "pages": 300
+        },
+        {
+          "cycle": 2,
+          "file": "pages-1000.pdf",
+          "open_ms": 5,
+          "pages": 1000
+        }
+      ],
+      "elapsed_seconds": 9.442,
+      "errors": 0,
+      "final_rss_mib": 21.78515625,
+      "initial_rss_mib": 14.58203125,
+      "peak_rss_mib": 24.76953125,
+      "render_p50_ms": 2.9863,
+      "render_p95_ms": 4.6764,
+      "rendered_pages": 2800,
+      "rss_growth_after_warmup_mib": 0,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 2,
+      "stable_baseline_rss_mib": 21.78515625,
+      "throughput_pages_per_second": 296.5473416649015
+    }
+  },
+  "corpus": [
+    {
+      "file": "cjk-text.pdf",
+      "bytes": 5348,
+      "sha256": "fc3ef7d94bec417276366eea85c572e7d9f895c00dcb644e9afd6b96cdac3cdf"
+    },
+    {
+      "file": "damaged-xref.pdf",
+      "bytes": 5348,
+      "sha256": "e4ef7bb9c80655be1b88f2617f9f339fe91650fa6eaefe26ab9ff0ce1afe3bac"
+    },
+    {
+      "file": "embedded-fonts.pdf",
+      "bytes": 39108,
+      "sha256": "f9ae473c5f882d4f5e34592d43d8f82482e578c181d43e6152ad8aec32168750"
+    },
+    {
+      "file": "encrypted-aes256.pdf",
+      "bytes": 6000,
+      "sha256": "dc5193eaac153ece2e365f6846eaee745c8a3550e583b2218eb52a7d0e035ecd"
+    },
+    {
+      "file": "large-image.pdf",
+      "bytes": 295940,
+      "sha256": "2c621c631bbc984ef74f07a9b2d8401b12fd0c6e7b2a803e5cd144db8da7d149"
+    },
+    {
+      "file": "object-streams.pdf",
+      "bytes": 3476,
+      "sha256": "fb8c3235421cc276dc7ba7ecd351cf9b2f154ece34c84e9333eb6c56c808acff"
+    },
+    {
+      "file": "optional-layers.pdf",
+      "bytes": 967,
+      "sha256": "11613d38e04fc01985d4849772ebc2de42ea5fd6d8c299ffcf9e5a448bb4515c"
+    },
+    {
+      "file": "pages-100.pdf",
+      "bytes": 81060,
+      "sha256": "816a06aa0d616255344e93e7ade3aa725ce50c59c37f94100a424e389dc61890"
+    },
+    {
+      "file": "pages-1000.pdf",
+      "bytes": 800803,
+      "sha256": "6e02551d31402d5aa52d51c15bcb12a1064c643b4080b90f693a16e641ef2380"
+    },
+    {
+      "file": "pages-300.pdf",
+      "bytes": 240103,
+      "sha256": "0b85ea77db38314fba3f5db799ed8fdc3184ddb17a0616cd50858d2ad146893c"
+    },
+    {
+      "file": "rtl-hebrew-arabic.pdf",
+      "bytes": 46422,
+      "sha256": "134a8054b9e1db6dc85561104da06037a58c23788980dde26318525e22461a5c"
+    },
+    {
+      "file": "transparency.pdf",
+      "bytes": 1766,
+      "sha256": "7a320546425ca4d55e8dd0da862a1c1a43fcf1bf52ca36ea18cb03a65cbe7eb8"
+    }
+  ]
+}

@@ -149,6 +149,9 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "qpdf structure validation failed: $Path" }
           }
           Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/saved-graph.pdf"
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/repeated-save-plain-2.pdf"
+          Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/repeated-save-plain-3.pdf"
           Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/edited.pdf"
           Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
           Test-PdfStructure "$env:RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
@@ -173,6 +176,9 @@ jobs:
         shell: bash
         run: |
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/decrypted.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/saved-graph.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/repeated-save-plain-2.pdf"
+          qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/repeated-save-plain-3.pdf"
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/edited.pdf"
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/redacted.pdf"
           qpdf --warning-exit-0 --check "$RUNNER_TEMP/nexpdf-test-output/external-watermark-removed.pdf"
@@ -223,3 +229,51 @@ jobs:
           name: validation-${{ runner.os }}
           path: ${{ runner.temp }}/nexpdf-test-output
           if-no-files-found: error
+
+  fuzz:
+    name: Linux ASan UBSan fuzz smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          submodules: recursive
+      - uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: 6.11.2
+          arch: linux_gcc_64
+          archives: icu qtbase
+          cache: true
+      - name: Build instrumented engine and harness
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang ninja-build
+          make -C third_party/mupdf -j3 build=sanitize OUT=build/fuzz CC=clang CXX=clang++ \
+            shared=no HAVE_CURL=no HAVE_GLUT=no HAVE_X11=no HAVE_TESSERACT=no HAVE_LEPTONICA=no HAVE_ZXINGCPP=no \
+            XCFLAGS="-fsanitize=fuzzer-no-link -DFZ_ENABLE_OCR_OUTPUT=0 -DFZ_ENABLE_DOCX_OUTPUT=0 -DFZ_ENABLE_ODT_OUTPUT=0 -DFZ_ENABLE_BARCODE=0" libs
+          mkdir -p "$RUNNER_TEMP/mupdf-fuzz/lib" "$RUNNER_TEMP/mupdf-fuzz/include"
+          cp -R third_party/mupdf/include/mupdf "$RUNNER_TEMP/mupdf-fuzz/include/"
+          cp third_party/mupdf/build/fuzz/libmupdf*.a "$RUNNER_TEMP/mupdf-fuzz/lib/"
+          cmake -S . -B build/fuzz -G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" -DMUPDF_ROOT="$RUNNER_TEMP/mupdf-fuzz" \
+            -DNEXPDF_BUILD_APP=OFF -DNEXPDF_BUILD_TESTS=OFF -DNEXPDF_BUILD_FUZZERS=ON -DNEXPDF_ENABLE_SANITIZERS=ON
+          cmake --build build/fuzz --parallel 3
+      - name: Run bounded fuzz smoke
+        shell: bash
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          mkdir -p "$RUNNER_TEMP/fuzz-corpus" "$RUNNER_TEMP/fuzz-results"
+          cp tests/fuzz/seeds/*.pdf "$RUNNER_TEMP/fuzz-corpus/"
+          build/fuzz/nexpdf_fuzz_open "$RUNNER_TEMP/fuzz-corpus" -seed=1234 -max_len=65536 \
+            -max_total_time=30 -timeout=5 -rss_limit_mb=2048 -artifact_prefix="$RUNNER_TEMP/fuzz-results/" \
+            2>&1 | tee "$RUNNER_TEMP/fuzz-results/run.log"
+      - name: Upload fuzz evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: fuzz-smoke
+          path: ${{ runner.temp }}/fuzz-results
+          if-no-files-found: warn

@@ -8,6 +8,9 @@
 #include <QMenu>
 #include <QPrintDialog>
 #include <QPrinter>
+#include <QProgressDialog>
+#include <QTimer>
+#include <QSignalSpy>
 #include <QPushButton>
 #include <QSettings>
 #include <QTemporaryDir>
@@ -65,6 +68,7 @@ class MainWindowTests final : public QObject {
 private slots:
     void opensFixtureAndCapturesUi();
     void printActionOffersDialogForOpenDocument();
+    void printsSelectedPagesAndCancels();
 };
 
 void MainWindowTests::opensFixtureAndCapturesUi()
@@ -211,6 +215,49 @@ void MainWindowTests::printActionOffersDialogForOpenDocument()
     dialog.close();
     QTRY_VERIFY(!dialog.isVisible());
 #endif
+}
+
+void MainWindowTests::printsSelectedPagesAndCancels()
+{
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, directory.path());
+    const QString input = directory.filePath(QStringLiteral("print-input.pdf"));
+    QFile file(input); QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write(minimalPdf()), minimalPdf().size()); file.close();
+    MainWindow window;
+    QSignalSpy opened(&window.session_, &nexpdf::DocumentSession::opened),
+        states(&window.session_, &nexpdf::DocumentSession::stateChanged);
+    window.openFile(input); QTRY_COMPARE(opened.size(), 1);
+    for (int i = 0; i < 2; ++i) {
+        const auto before = states.size();
+        nexpdf::EditOperation edit; edit.kind = nexpdf::EditKind::InsertBlankPage; edit.pageIndex = i + 1;
+        window.session_.applyEdit(edit); QTRY_VERIFY(states.size() > before);
+    }
+    QPrinter printer;
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setResolution(144);
+    const QString output = directory.filePath(QStringLiteral("printed.pdf"));
+    printer.setOutputFileName(output);
+    printer.setFromTo(2, 3);
+    QVERIFY(window.printTo(printer));
+    nexpdf::DocumentSession verifier; QSignalSpy verified(&verifier, &nexpdf::DocumentSession::opened);
+    verifier.open(output); QTRY_COMPARE(verified.size(), 1);
+    QCOMPARE(qvariant_cast<nexpdf::DocumentInfo>(verified.first().first()).pageCount, 2);
+
+    // Cancellation before the first render must release the job without a native printer.
+    printer.setOutputFileName(directory.filePath(QStringLiteral("cancelled.pdf")));
+    QTimer::singleShot(0, &window, [&] {
+        if (auto *progress = window.findChild<QProgressDialog *>()) progress->cancel();
+    });
+    QVERIFY(!window.printTo(printer));
+    QVERIFY(!window.printing_);
+
+    // A document revision change during the nested event loop must also release it.
+    printer.setOutputFileName(directory.filePath(QStringLiteral("changed.pdf")));
+    QTimer::singleShot(0, &window, [&] { window.session_.close(); });
+    QVERIFY(!window.printTo(printer));
+    QVERIFY(!window.printing_);
 }
 
 QTEST_MAIN(MainWindowTests)

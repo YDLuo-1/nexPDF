@@ -144,6 +144,12 @@ int main(int argc, char *argv[])
                 pageTimer.start();
                 session.requestRender(request);
                 if (!waitForEither(rendered, failed, 60000)) {
+                    session.cancelRender(request.requestId);
+                    ++errors;
+                    continue;
+                }
+                const auto result = qvariant_cast<nexpdf::RenderResult>(rendered.first().first());
+                if (result.error.isError() || result.image.isNull()) {
                     ++errors;
                     continue;
                 }
@@ -153,7 +159,7 @@ int main(int argc, char *argv[])
             }
             closed.clear();
             session.close();
-            if (closed.isEmpty()) (void)closed.wait(30000);
+            if (closed.isEmpty() && !closed.wait(30000)) ++errors;
         }
         const double rss = currentRssMiB();
         cycleRss.append(rss);

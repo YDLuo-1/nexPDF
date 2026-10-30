@@ -40,6 +40,8 @@
 #include <QPainter>
 #include <QPrintDialog>
 #include <QPrinter>
+#include <QProgressDialog>
+#include <QScopedValueRollback>
 #include <QPushButton>
 #include <QPolygonF>
 #include <QScrollArea>
@@ -72,6 +74,8 @@ MainWindow::MainWindow(QWidget *parent)
         pageCount_ = info.pageCount;
         revision_ = info.revision;
         signedDocument_ = info.signedDocument;
+        canPrint_ = info.canPrint;
+        canPrintHighQuality_ = info.canPrintHighQuality;
         pendingObjectBounds_ = {};
         pendingObjectPage_ = -1;
         pendingText_.clear();
@@ -341,6 +345,7 @@ void MainWindow::openFile(const QString &path)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    if (printing_) { event->ignore(); return; }
     saveReadingPosition();
     if (confirmDiscard()) {
         event->accept();
@@ -521,6 +526,7 @@ void MainWindow::updatePageActions()
     if (currentPath_.isEmpty()) {
         return;
     }
+    printAction_->setEnabled(canPrint_ && pageCount_ > 0 && !printing_);
     const bool multiPage = pageCount_ > 1;
     deletePageAction_->setEnabled(multiPage);
     movePageUpAction_->setEnabled(multiPage);
@@ -1206,105 +1212,100 @@ void MainWindow::createDecryptedCopy()
 
 void MainWindow::printDocument()
 {
-    if (pageCount_ <= 0 || revision_ == 0) {
-        return;
-    }
-
+    if (printing_ || !canPrint_ || pageCount_ <= 0 || revision_ == 0) return;
     QPrinter printer(QPrinter::HighResolution);
     QPrintDialog dialog(&printer, this);
     dialog.setMinMax(1, pageCount_);
-    if (dialog.exec() != QDialog::Accepted) {
-        return;
-    }
+    if (dialog.exec() == QDialog::Accepted) printTo(printer);
+}
 
+bool MainWindow::printTo(QPrinter &printer, int timeoutMs)
+{
+    if (printing_ || !canPrint_ || pageCount_ <= 0 || revision_ == 0) return false;
+    QScopedValueRollback printingGuard(printing_, true);
+    QProgressDialog progress(tr("Preparing print job…"), tr("Cancel"), 0, pageCount_, this);
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setMinimumDuration(0);
+    progress.setAutoClose(false);
+    progress.show();
     int fromPage = printer.fromPage();
     int toPage = printer.toPage();
     if (fromPage < 1 || fromPage > pageCount_) fromPage = 1;
     if (toPage < fromPage || toPage > pageCount_) toPage = pageCount_;
-
     const quint64 printRevision = revision_;
-    const qreal scale = qMin(printer.resolution(), 300) / 72.0;
-
+    const qreal scale = qMin(printer.resolution(), canPrintHighQuality_ ? 300 : 150) / 72.0;
     QPainter painter;
     if (!painter.begin(&printer)) {
-        QMessageBox::warning(this, tr("Error"), tr("Unable to open the printer."));
-        statusLabel_->setText(tr("Printing failed"));
-        return;
+        statusLabel_->setText(tr("Unable to open the printer."));
+        return false;
     }
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-
     int printed = 0;
     for (int page = fromPage; page <= toPage; ++page) {
-        if (revision_ != printRevision || pageCount_ <= 0) {
-            // The document changed underneath the print job; a queued render
-            // would be dropped silently, so stop instead of waiting forever.
-            statusLabel_->setText(tr("Printing failed"));
-            return;
+        progress.setLabelText(tr("Printing page %1 of %2").arg(page).arg(toPage));
+        progress.setValue(printed);
+        if (progress.wasCanceled() || revision_ != printRevision || pageCount_ <= 0) {
+            printer.abort();
+            statusLabel_->setText(tr("Printing cancelled"));
+            return false;
         }
-        statusLabel_->setText(tr("Printing page %1 of %2").arg(page).arg(toPage));
-
-        const quint64 requestId = nextPrintRequestId_++;
         nexpdf::RenderRequest request;
-        request.requestId = requestId;
+        request.requestId = nextPrintRequestId_++;
         request.revision = printRevision;
         request.pageIndex = page - 1;
-        request.scale = scale;  // Empty tilePixels renders the full page.
+        request.scale = scale;
         request.priority = 20;
-
+        request.forPrinting = true;
+        request.timeoutMs = timeoutMs;
         QImage image;
-        bool renderFailed = false;
+        bool cancelled = false;
+        QString error;
         QEventLoop loop;
-        const auto readyConnection = connect(&session_, &nexpdf::DocumentSession::renderReady,
-            &loop, [&](const nexpdf::RenderResult &result) {
-                if (result.requestId != requestId) return;
+        QTimer timer;
+        timer.setSingleShot(true);
+        auto cancel = [&] { cancelled = true; session_.cancelRender(request.requestId); loop.quit(); };
+        connect(&session_, &nexpdf::DocumentSession::renderReady, &loop,
+            [&](const nexpdf::RenderResult &result) {
+                if (result.requestId != request.requestId) return;
                 image = result.image;
+                error = result.error.message;
+                cancelled = result.error.code == nexpdf::ErrorCode::Cancelled;
                 loop.quit();
             });
-        // A render failure also reaches MainWindow::showError, which already
-        // presents the message box; here it only has to release the loop.
-        const auto failedConnection = connect(&session_, &nexpdf::DocumentSession::failed,
-            &loop, [&](const nexpdf::OperationError &) {
-                renderFailed = true;
-                loop.quit();
-            });
-        const auto closedConnection = connect(&session_, &nexpdf::DocumentSession::closed,
-            &loop, [&] { renderFailed = true; loop.quit(); });
+        connect(&session_, &nexpdf::DocumentSession::closed, &loop, cancel);
+        connect(&session_, &nexpdf::DocumentSession::opened, &loop, cancel);
+        connect(&session_, &nexpdf::DocumentSession::stateChanged, &loop,
+            [&](quint64 revision, bool, bool, bool) { if (revision != printRevision) cancel(); });
+        connect(&progress, &QProgressDialog::canceled, &loop, cancel);
+        connect(&timer, &QTimer::timeout, &loop, cancel);
         session_.requestRender(request);
+        timer.start(std::clamp(timeoutMs, 1, 60000));
         loop.exec();
-        disconnect(readyConnection);
-        disconnect(failedConnection);
-        disconnect(closedConnection);
-
-        if (renderFailed) {
-            statusLabel_->setText(tr("Printing failed"));
-            return;
+        if (cancelled || image.isNull() || revision_ != printRevision) {
+            printer.abort();
+            statusLabel_->setText(cancelled ? tr("Printing cancelled")
+                : error.isEmpty() ? tr("Printing failed") : error);
+            return false;
         }
-        if (image.isNull() || revision_ != printRevision) {
-            QMessageBox::warning(this, tr("Error"), tr("Unable to render the page."));
-            statusLabel_->setText(tr("Printing failed"));
-            return;
-        }
-
-        // Fit the rendered page proportionally and centred onto the printable
-        // area. The image was rendered at `scale * 72` DPI, so restore physical
-        // size at the printer resolution before clamping to the page rect.
         const QRectF pageRect = printer.pageRect(QPrinter::DevicePixel);
-        const qreal imageDpi = scale * 72.0;
-        QSizeF targetSize(image.width() * printer.resolution() / imageDpi,
-                          image.height() * printer.resolution() / imageDpi);
+        QSizeF targetSize = image.size();
         targetSize.scale(pageRect.size(), Qt::KeepAspectRatio);
         painter.drawImage(QRectF(pageRect.left() + (pageRect.width() - targetSize.width()) / 2.0,
                                  pageRect.top() + (pageRect.height() - targetSize.height()) / 2.0,
-                                 targetSize.width(), targetSize.height()),
-                          image);
+                                 targetSize.width(), targetSize.height()), image);
         ++printed;
         if (page < toPage && !printer.newPage()) {
+            printer.abort();
             statusLabel_->setText(tr("Printing failed"));
-            return;
+            return false;
         }
     }
-    painter.end();
+    if (!painter.end()) {
+        statusLabel_->setText(tr("Printing failed"));
+        return false;
+    }
     statusLabel_->setText(tr("Printed %1 page(s)").arg(printed));
+    return true;
 }
 
 void MainWindow::applyPageOperation(const nexpdf::EditKind kind, const int rotation)

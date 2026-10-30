@@ -41,20 +41,13 @@ void pruneOldCrashFiles()
 
 #ifdef Q_OS_WIN
 
-LPCWSTR toWide(const QString &text)
-{
-    static wchar_t buffer[MAX_PATH];
-    const int size = text.toWCharArray(buffer);
-    buffer[size] = L'\0';
-    return buffer;
-}
-
 LONG WINAPI writeMiniDump(EXCEPTION_POINTERS *exception)
 {
     const QString path = crashDirectory() + QStringLiteral("/nexpdf-")
         + QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-hhmmss"))
         + QStringLiteral(".dmp");
-    const HANDLE file = CreateFileW(toWide(path), GENERIC_WRITE, 0, nullptr,
+    const std::wstring widePath = QDir::toNativeSeparators(path).toStdWString();
+    const HANDLE file = CreateFileW(widePath.c_str(), GENERIC_WRITE, 0, nullptr,
                                     CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file != INVALID_HANDLE_VALUE) {
         MINIDUMP_EXCEPTION_INFORMATION info{};
@@ -80,7 +73,7 @@ void writeSignalReport(const int signalNumber)
     char path[512];
     const int written = std::snprintf(path, sizeof(path), "%s/nexpdf-signal.log",
                                       g_crashDirectoryPath.constData());
-    if (written <= 0) {
+    if (written <= 0 || written >= static_cast<int>(sizeof(path))) {
         return;
     }
     const int fd = ::open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);

@@ -4,15 +4,21 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.5-rc.1] - 2026-10-30
+
+- Save from an independent PDF graph so encryption writes and failures cannot alter the live document or undo history; track the saved undo position across branches. / 从独立 PDF 对象图保存，避免加密写入和失败破坏当前文档与撤销历史；正确跟踪保存点和撤销分支。
+- Keep sliced searches on the document thread; remove selected anonymous watermarks by stable identity. / 分批搜索保持在文档线程；按稳定标识移除选中的匿名水印。
+- Enforce copy/print permissions, including owner access and low-resolution printing. / 执行复制、打印权限，包括所有者权限和低分辨率打印。
+- Complete failed/cancelled render requests, cancel obsolete work, bound raster size and render concurrency, and make printing cancellable with a wait timeout. / 为失败和取消的渲染请求返回终态，取消过期任务，限制栅格尺寸与并发，并为打印增加取消和等待超时。
+- Fix viewport painting, tile retry state, long crash-path overflow and password buffer erasure. / 修复视口绘制范围、瓦片重试状态、过长崩溃路径溢出和密码缓冲区清理。
+- Update MuPDF to 1.28.6; fix the fuzz harness and add instrumented Linux fuzz CI. / MuPDF 更新至 1.28.6；修复 fuzz 构建并增加 Linux 插桩验证。
+- Add focused regressions and refresh version and acceptance documentation. / 补充针对性回归并统一版本与验收文档。
+
 ## [1.0.4] - 2026-10-24
 
 ### Added / 新增
 
 - Printing via File → "Print…" (`Ctrl+P`): system print dialog with the 1..page-count range, whole-page rendering at up to 300 DPI through the existing background render session, proportional centring on the printable area, and status-bar progress ending in "Printed N page(s)". / 新增文件菜单"打印…"（`Ctrl+P`）：系统打印对话框支持 1..页数范围，经既有后台渲染会话按不高于 300 DPI 整页渲染，等比居中打印到可打印区域，状态栏显示进度并最终显示"已打印 N 页"。打印路径经编译与界面集成验证（含 UI 测试），未做实体打印机输出验证。
-
-## [1.0.4] - 2026-10-24
-
-- Add printing: "Print…" (Ctrl+P) with page-range selection, 300 dpi-capped rendering, centered fit-to-page output. / 新增打印：Ctrl+P 页面范围选择，300dpi 封顶渲染，等比居中输出。
 
 ## [1.0.3] - 2026-10-24
 

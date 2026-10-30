@@ -5,6 +5,7 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QtTest>
+#include <limits>
 
 namespace {
 
@@ -94,6 +95,52 @@ void retainImage(const QImage &image, const QString &name)
     QVERIFY(image.save(output + QLatin1Char('/') + name));
 }
 
+static QByteArray multiPageFixture(int pageCount = 1, bool watermarks = false)
+{
+    QList<QByteArray> objects;
+    QByteArray kids;
+    for (int p=0;p<pageCount;++p) kids += QByteArray::number(3+p) + " 0 R ";
+    objects << "<< /Type /Catalog /Pages 2 0 R >>"
+            << "<< /Type /Pages /Kids [" + kids + "] /Count " + QByteArray::number(pageCount) + " >>";
+    const int contentId = 3 + pageCount, fontId = contentId + 1;
+    for(int p=0;p<pageCount;++p) {
+        QByteArray page = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Resources << /Font << /F1 "
+            + QByteArray::number(fontId) + " 0 R >> >> /Contents " + QByteArray::number(contentId) + " 0 R";
+        if(watermarks) page += " /Annots [" + QByteArray::number(fontId+1) + " 0 R "
+            + QByteArray::number(fontId+2) + " 0 R " + QByteArray::number(fontId+3) + " 0 R]";
+        objects << page + " >>";
+    }
+    const QByteArray content = "BT /F1 18 Tf 40 330 Td (nexPDF) Tj ET\n";
+    objects << "<< /Length " + QByteArray::number(content.size()) + " >>\nstream\n" + content + "endstream"
+            << "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+    if(watermarks) {
+        for(int x : {20,120,220}) objects << "<< /Type /Annot /Subtype /Watermark /Rect ["
+            + QByteArray::number(x) + " 20 " + QByteArray::number(x+40)
+            + " 70] /Contents (External Watermark) >>";
+    }
+    QByteArray pdf = "%PDF-1.7\n";
+    QList<qsizetype> offsets;
+    for(qsizetype i=0;i<objects.size();++i) {
+        offsets << pdf.size();
+        pdf += QByteArray::number(i+1)+" 0 obj\n"+objects[i]+"\nendobj\n";
+    }
+    auto xref=pdf.size();
+    pdf += "xref\n0 "+QByteArray::number(objects.size()+1)+"\n0000000000 65535 f \n";
+    for(auto offset:offsets) pdf += QByteArray::number(offset).rightJustified(10,'0')+" 00000 n \n";
+    pdf += "trailer\n<< /Size "+QByteArray::number(objects.size()+1)+" /Root 1 0 R >>\nstartxref\n"
+        +QByteArray::number(xref)+"\n%%EOF\n";
+    return pdf;
+}
+static QString writeMultiPageFixture(QTemporaryDir &dir,int pages=1,bool marks=false)
+{
+    auto path=dir.filePath(QStringLiteral("input.pdf"));
+    QFile f(path);
+    if(!f.open(QIODevice::WriteOnly)) return {};
+    const auto bytes=multiPageFixture(pages,marks);
+    if(f.write(bytes)!=bytes.size()) return {};
+    return path;
+}
+
 } // namespace
 
 class DocumentSessionTests final : public QObject {
@@ -101,6 +148,17 @@ class DocumentSessionTests final : public QObject {
 
 private slots:
     void opensRendersAndSearches();
+    void undoAfterSaveMustBeDirty();
+    void savePreservesRedoAndFailedSaveState();
+    void savePreservesCatalogAndMetadata();
+    void replacesOpenSourceWithoutLosingUndo();
+    void renderRequestsAlwaysFinish();
+    void slicedSearchSurvivesReplacementAndEdits();
+    void keepAfterEncryptionMustStayEncrypted_data();
+    void keepAfterEncryptionMustStayEncrypted();
+    void copyRestrictionMustBeHonored();
+    void batchRemovalMustKeepUnselectedWatermark();
+
     void encryptsAndDecryptsWithValidation();
     void enforcesRequiredPasswordsAndAllowsMatchingCredentials();
     void editsPagesAnnotationsAndJournal();
@@ -157,8 +215,9 @@ void DocumentSessionTests::opensRendersAndSearches()
     outsideTile.scale = 1.0;
     outsideTile.tilePixels = QRect(1000, 1000, 10, 10);
     session.requestRender(outsideTile);
-    QTRY_COMPARE_WITH_TIMEOUT(failed.size(), 1, 5000);
-    QCOMPARE(qvariant_cast<nexpdf::OperationError>(failed.first().first()).code,
+    QTRY_COMPARE_WITH_TIMEOUT(rendered.size(), 2, 5000);
+    QCOMPARE(qvariant_cast<nexpdf::RenderResult>(rendered.last().first()).requestId, quint64(8));
+    QCOMPARE(qvariant_cast<nexpdf::RenderResult>(rendered.last().first()).error.code,
              nexpdf::ErrorCode::EngineError);
 }
 
@@ -832,6 +891,295 @@ void DocumentSessionTests::removingWatermarkAfterRedactionKeepsRedaction()
     QTRY_COMPARE_WITH_TIMEOUT(verificationSearch.size(), 1, 5000);
     QVERIFY(qvariant_cast<QVector<nexpdf::SearchHit>>(
         verificationSearch.first().first()).isEmpty());
+}
+
+void DocumentSessionTests::undoAfterSaveMustBeDirty()
+{
+    QTemporaryDir d; QVERIFY(d.isValid());
+    nexpdf::DocumentSession s;
+    QSignalSpy opened(&s,&nexpdf::DocumentSession::opened), states(&s,&nexpdf::DocumentSession::stateChanged),
+        saved(&s,&nexpdf::DocumentSession::saved), failed(&s,&nexpdf::DocumentSession::failed),
+        counts(&s,&nexpdf::DocumentSession::pageCountChanged);
+    s.open(writeMultiPageFixture(d)); QTRY_COMPARE(opened.size(),1);
+    nexpdf::EditOperation edit; edit.kind=nexpdf::EditKind::InsertBlankPage; edit.pageIndex=1;
+    s.applyEdit(edit); QTRY_COMPARE(counts.size(),1);
+    s.saveAs(d.filePath(QStringLiteral("saved.pdf"))); QTRY_COMPARE(saved.size(),1);
+    QTRY_VERIFY(!states.last().at(1).toBool());
+    for(int i=0;i<10 && states.last().at(2).toBool();++i) {
+        auto before=states.size(); s.undo(); QTRY_VERIFY(states.size()>before);
+    }
+    QCOMPARE(failed.size(),0); QCOMPARE(counts.last().first().toInt(),1);
+    QVERIFY2(states.last().at(1).toBool(),"Undo changed saved two-page document back to one page but modified=false");
+}
+void DocumentSessionTests::keepAfterEncryptionMustStayEncrypted_data()
+{
+    QTest::addColumn<int>("algorithm");
+    QTest::newRow("AES-128") << static_cast<int>(nexpdf::EncryptionAlgorithm::Aes128);
+    QTest::newRow("AES-256") << static_cast<int>(nexpdf::EncryptionAlgorithm::Aes256);
+}
+
+void DocumentSessionTests::keepAfterEncryptionMustStayEncrypted()
+{
+    QFETCH(int, algorithm);
+    QTemporaryDir d; QVERIFY(d.isValid());
+    nexpdf::DocumentSession session;
+    QSignalSpy opened(&session, &nexpdf::DocumentSession::opened), saved(&session, &nexpdf::DocumentSession::saved),
+        failed(&session, &nexpdf::DocumentSession::failed);
+    session.open(writeMultiPageFixture(d)); QTRY_COMPARE(opened.size(), 1);
+    nexpdf::SaveOptions enc;
+    enc.encryption.algorithm = static_cast<nexpdf::EncryptionAlgorithm>(algorithm);
+    enc.encryption.userPassword = QStringLiteral("reader-读者");
+    enc.encryption.ownerPassword = QStringLiteral("owner-所有者");
+    enc.encryption.permissions.copy = false;
+    QString path = d.filePath(QStringLiteral("encrypted.pdf"));
+    session.saveAs(path, enc); QTRY_COMPARE(saved.size(), 1);
+    for (int i = 0; i < 3; ++i) {
+        path = d.filePath(QStringLiteral("keep-%1.pdf").arg(i));
+        session.saveAs(path); QTRY_COMPARE(saved.size(), i + 2);
+        nexpdf::DocumentSession reader;
+        QSignalSpy prompts(&reader, &nexpdf::DocumentSession::passwordRequired),
+            ropen(&reader, &nexpdf::DocumentSession::opened), text(&reader, &nexpdf::DocumentSession::textExtracted);
+        reader.open(path); QTRY_COMPARE(prompts.size(), 1);
+        nexpdf::OpenOptions auth; auth.password = QStringLiteral("owner-所有者");
+        reader.open(path, auth); QTRY_COMPARE(ropen.size(), 1);
+        QVERIFY(qvariant_cast<nexpdf::DocumentInfo>(ropen.first().first()).canCopy);
+        reader.extractText(0, QRectF(0, 0, 300, 400)); QTRY_COMPARE(text.size(), 1);
+        QVERIFY(text.first().at(2).toString().contains(QStringLiteral("nexPDF")));
+        // A new session must also retain the existing key when saving with Keep.
+        QSignalSpy rsaved(&reader, &nexpdf::DocumentSession::saved);
+        reader.saveAs(d.filePath(QStringLiteral("reopened-%1.pdf").arg(i)));
+        QTRY_COMPARE(rsaved.size(), 1);
+    }
+    enc.encryption = {};
+    enc.encryption.algorithm = nexpdf::EncryptionAlgorithm::None;
+    session.saveAs(d.filePath(QStringLiteral("plain.pdf")), enc); QTRY_COMPARE(saved.size(), 5);
+    const QString plain = d.filePath(QStringLiteral("plain-keep.pdf"));
+    session.saveAs(plain); QTRY_COMPARE(saved.size(), 6);
+    nexpdf::DocumentSession reader;
+    QSignalSpy plainOpen(&reader, &nexpdf::DocumentSession::opened);
+    reader.open(plain); QTRY_COMPARE(plainOpen.size(), 1);
+    QVERIFY(!qvariant_cast<nexpdf::DocumentInfo>(plainOpen.first().first()).encrypted);
+    QCOMPARE(failed.size(), 0);
+    retainArtifact(plain, QStringLiteral("repeated-save-plain-%1.pdf").arg(algorithm));
+}
+
+void DocumentSessionTests::copyRestrictionMustBeHonored()
+{
+    QTemporaryDir d; QVERIFY(d.isValid());
+    nexpdf::DocumentSession s;
+    QSignalSpy opened(&s,&nexpdf::DocumentSession::opened), saved(&s,&nexpdf::DocumentSession::saved);
+    s.open(writeMultiPageFixture(d)); QTRY_COMPARE(opened.size(),1);
+    nexpdf::SaveOptions enc; enc.encryption.algorithm=nexpdf::EncryptionAlgorithm::Aes128;
+    enc.encryption.userPassword=QStringLiteral("audit-reader"); enc.encryption.ownerPassword=QStringLiteral("audit-owner");
+    enc.encryption.permissions.copy=false; enc.encryption.permissions.print=false;
+    enc.encryption.permissions.highQualityPrint=false;
+    s.saveAs(d.filePath(QStringLiteral("restricted.pdf")),enc); QTRY_COMPARE(saved.size(),1);
+    nexpdf::DocumentSession reader;
+    QSignalSpy ropen(&reader,&nexpdf::DocumentSession::opened), extracted(&reader,&nexpdf::DocumentSession::textExtracted),
+        failed(&reader,&nexpdf::DocumentSession::failed);
+    nexpdf::OpenOptions auth; auth.password=QStringLiteral("audit-reader");
+    reader.open(d.filePath(QStringLiteral("restricted.pdf")),auth); QTRY_COMPARE(ropen.size(),1);
+    const auto info = qvariant_cast<nexpdf::DocumentInfo>(ropen.first().first());
+    QVERIFY(!info.canCopy);
+    QVERIFY(!info.canPrint);
+    QSignalSpy rendered(&reader, &nexpdf::DocumentSession::renderReady);
+    nexpdf::RenderRequest request; request.forPrinting = true; request.requestId = 1;
+    reader.requestRender(request); QTRY_COMPARE(rendered.size(), 1);
+    QCOMPARE(qvariant_cast<nexpdf::RenderResult>(rendered.first().first()).error.code,
+             nexpdf::ErrorCode::PermissionDenied);
+    reader.extractText(0,QRectF(0,0,300,400)); QTRY_VERIFY(!extracted.isEmpty() || !failed.isEmpty());
+    if(!extracted.isEmpty()) qInfo()<<"Extracted despite copy=false:"<<extracted.first().at(2).toString();
+    QVERIFY2(extracted.isEmpty(),"Reader-password session exported text despite copy=false");
+    enc.encryption.permissions.print = true;
+    s.saveAs(d.filePath(QStringLiteral("low-resolution.pdf")), enc); QTRY_COMPARE(saved.size(), 2);
+    reader.open(d.filePath(QStringLiteral("low-resolution.pdf")), auth); QTRY_COMPARE(ropen.size(), 2);
+    request.requestId = 2; request.scale = 300.0 / 72;
+    reader.requestRender(request); QTRY_COMPARE(rendered.size(), 2);
+    QCOMPARE(qvariant_cast<nexpdf::RenderResult>(rendered.last().first()).error.code,
+             nexpdf::ErrorCode::PermissionDenied);
+    request.requestId = 3; request.scale = 150.0 / 72;
+    reader.requestRender(request); QTRY_COMPARE(rendered.size(), 3);
+    QVERIFY(!qvariant_cast<nexpdf::RenderResult>(rendered.last().first()).image.isNull());
+    auth.password = QStringLiteral("audit-owner");
+    reader.open(d.filePath(QStringLiteral("restricted.pdf")), auth); QTRY_COMPARE(ropen.size(), 3);
+    QVERIFY(qvariant_cast<nexpdf::DocumentInfo>(ropen.last().first()).canPrintHighQuality);
+    request.requestId = 4; request.scale = 300.0 / 72;
+    reader.requestRender(request); QTRY_COMPARE(rendered.size(), 4);
+    QVERIFY(!qvariant_cast<nexpdf::RenderResult>(rendered.last().first()).image.isNull());
+}
+void DocumentSessionTests::batchRemovalMustKeepUnselectedWatermark()
+{
+    QTemporaryDir d; QVERIFY(d.isValid());
+    nexpdf::DocumentSession s;
+    QSignalSpy opened(&s,&nexpdf::DocumentSession::opened), scanned(&s,&nexpdf::DocumentSession::watermarksScanned),
+        state(&s,&nexpdf::DocumentSession::stateChanged), failed(&s,&nexpdf::DocumentSession::failed);
+    s.open(writeMultiPageFixture(d,1,true)); QTRY_COMPARE(opened.size(),1);
+    s.scanWatermarks(); QTRY_COMPARE(scanned.size(),1);
+    const auto initial=qvariant_cast<QVector<nexpdf::WatermarkCandidate>>(scanned.first().first());
+    QCOMPARE(initial.size(),3); QCOMPARE(initial.at(2).bounds.left(),220.0);
+    auto before=state.size(); s.removeWatermarks({initial.at(0).id,initial.at(1).id});
+    QTRY_VERIFY(state.size()>before); QCOMPARE(failed.size(),0);
+    scanned.clear(); s.scanWatermarks(); QTRY_COMPARE(scanned.size(),1);
+    const auto remaining=qvariant_cast<QVector<nexpdf::WatermarkCandidate>>(scanned.first().first());
+    QCOMPARE(remaining.size(),1);
+    QCOMPARE(remaining.first().bounds.left(),220.0);
+}
+
+
+void DocumentSessionTests::savePreservesRedoAndFailedSaveState()
+{
+    QTemporaryDir d; QVERIFY(d.isValid());
+    nexpdf::DocumentSession s;
+    QSignalSpy opened(&s, &nexpdf::DocumentSession::opened), states(&s, &nexpdf::DocumentSession::stateChanged),
+        saved(&s, &nexpdf::DocumentSession::saved), failed(&s, &nexpdf::DocumentSession::failed);
+    s.open(writeMultiPageFixture(d)); QTRY_COMPARE(opened.size(), 1);
+    auto editAndWait = [&](nexpdf::EditKind kind) {
+        const auto before = states.size();
+        nexpdf::EditOperation edit; edit.kind = kind; edit.pageIndex = 0; edit.rotation = 90;
+        s.applyEdit(edit); QTRY_VERIFY(states.size() > before);
+    };
+    editAndWait(nexpdf::EditKind::InsertBlankPage);
+    s.saveAs(d.filePath(QStringLiteral("saved.pdf"))); QTRY_COMPARE(saved.size(), 1);
+    auto before = states.size(); s.undo(); QTRY_VERIFY(states.size() > before);
+    QVERIFY(states.last().at(1).toBool());
+    before = states.size(); s.redo(); QTRY_VERIFY(states.size() > before);
+    QVERIFY(!states.last().at(1).toBool());
+    before = states.size(); s.undo(); QTRY_VERIFY(states.size() > before);
+    // Saving after undo must not destroy the redo branch or add a synthetic save step.
+    s.saveAs(d.filePath(QStringLiteral("one-page.pdf"))); QTRY_COMPARE(saved.size(), 2);
+    QVERIFY(states.last().at(3).toBool());
+    before = states.size(); s.redo(); QTRY_VERIFY(states.size() > before);
+    QVERIFY(states.last().at(1).toBool());
+    s.saveAs(d.filePath(QStringLiteral("two-pages.pdf"))); QTRY_COMPARE(saved.size(), 3);
+    before = states.size(); s.undo(); QTRY_VERIFY(states.size() > before);
+    editAndWait(nexpdf::EditKind::RotatePage);
+    QVERIFY(states.last().at(1).toBool()); // same journal position, different branch
+    const QString blocked = d.filePath(QStringLiteral("directory.pdf"));
+    QVERIFY(QDir().mkpath(blocked));
+    nexpdf::SaveOptions replace; replace.overwriteConfirmed = true;
+    replace.encryption.algorithm = nexpdf::EncryptionAlgorithm::Aes256;
+    replace.encryption.userPassword = QStringLiteral("reader");
+    replace.encryption.ownerPassword = QStringLiteral("owner");
+    s.saveAs(blocked, replace); QTRY_COMPARE(failed.size(), 1);
+    QVERIFY(states.last().at(1).toBool());
+    const QString recovered = d.filePath(QStringLiteral("recovered.pdf"));
+    s.saveAs(recovered); QTRY_COMPARE(saved.size(), 4);
+    nexpdf::DocumentSession reader; QSignalSpy reopened(&reader, &nexpdf::DocumentSession::opened);
+    reader.open(recovered); QTRY_COMPARE(reopened.size(), 1);
+    QVERIFY(!qvariant_cast<nexpdf::DocumentInfo>(reopened.first().first()).encrypted);
+    QCOMPARE(QDir(d.path()).entryList({QStringLiteral(".nexpdf-*.tmp")}, QDir::Files | QDir::Hidden).size(), 0);
+}
+
+void DocumentSessionTests::renderRequestsAlwaysFinish()
+{
+    QTemporaryDir d; QVERIFY(d.isValid());
+    nexpdf::DocumentSession s;
+    QSignalSpy opened(&s, &nexpdf::DocumentSession::opened), rendered(&s, &nexpdf::DocumentSession::renderReady),
+        closed(&s, &nexpdf::DocumentSession::closed);
+    s.open(writeMultiPageFixture(d, 33)); QTRY_COMPARE(opened.size(), 1);
+    const auto info = qvariant_cast<nexpdf::DocumentInfo>(opened.first().first());
+    nexpdf::RenderRequest req; req.requestId = 1; req.revision = info.revision + 1;
+    s.requestRender(req); QTRY_COMPARE(rendered.size(), 1);
+    QCOMPARE(qvariant_cast<nexpdf::RenderResult>(rendered.last().first()).error.code, nexpdf::ErrorCode::Cancelled);
+    req.requestId = 2; req.revision = info.revision; req.scale = std::numeric_limits<double>::infinity();
+    s.requestRender(req); QTRY_COMPARE(rendered.size(), 2);
+    QCOMPARE(qvariant_cast<nexpdf::RenderResult>(rendered.last().first()).error.code, nexpdf::ErrorCode::InvalidArgument);
+    req.requestId = 3; req.scale = 1000;
+    s.requestRender(req); QTRY_COMPARE(rendered.size(), 3);
+    QVERIFY(qvariant_cast<nexpdf::RenderResult>(rendered.last().first()).error.isError());
+    req.scale = 1;
+    for (quint64 id = 4; id <= 36; ++id) {
+        req.requestId = id; req.pageIndex = static_cast<int>(id - 4);
+        s.requestRender(req); s.cancelRender(id);
+    }
+    s.close(); QTRY_COMPARE(closed.size(), 1);
+    QTRY_COMPARE(rendered.size(), 36);
+    QSet<quint64> ids;
+    for (const auto &event : rendered) ids.insert(qvariant_cast<nexpdf::RenderResult>(event.first()).requestId);
+    QCOMPARE(ids.size(), 36);
+    s.open(d.filePath(QStringLiteral("input.pdf"))); QTRY_COMPARE(opened.size(), 2);
+    req.requestId = 37; req.revision = 0; req.pageIndex = 0; req.scale = 10; req.timeoutMs = 1;
+    s.requestRender(req); QTRY_COMPARE(rendered.size(), 37);
+    QCOMPARE(qvariant_cast<nexpdf::RenderResult>(rendered.last().first()).error.code, nexpdf::ErrorCode::Cancelled);
+}
+
+void DocumentSessionTests::slicedSearchSurvivesReplacementAndEdits()
+{
+    QTemporaryDir d; QVERIFY(d.isValid());
+    nexpdf::DocumentSession s;
+    QSignalSpy opened(&s, &nexpdf::DocumentSession::opened), searched(&s, &nexpdf::DocumentSession::searchFinished),
+        states(&s, &nexpdf::DocumentSession::stateChanged), failed(&s, &nexpdf::DocumentSession::failed);
+    s.open(writeMultiPageFixture(d, 65)); QTRY_COMPARE(opened.size(), 1);
+    s.search(QStringLiteral("nexPDF")); QTRY_COMPARE(searched.size(), 1);
+    QCOMPARE(qvariant_cast<QVector<nexpdf::SearchHit>>(searched.first().first()).size(), 65);
+    searched.clear();
+    s.search(QStringLiteral("nexPDF"));
+    nexpdf::EditOperation edit; edit.kind = nexpdf::EditKind::DeletePage; edit.pageIndex = 0;
+    const auto before = states.size(); s.applyEdit(edit); QTRY_VERIFY(states.size() > before);
+    s.search(QStringLiteral("nexPDF")); QTRY_VERIFY(!searched.isEmpty());
+    QTRY_COMPARE(qvariant_cast<QVector<nexpdf::SearchHit>>(searched.last().first()).size(), 64);
+    QCOMPARE(failed.size(), 0);
+}
+
+void DocumentSessionTests::savePreservesCatalogAndMetadata()
+{
+    QTemporaryDir d; QVERIFY(d.isValid());
+    QByteArray bytes = assemblePdf({
+        "<< /Type /Catalog /Pages 2 0 R /Outlines 6 0 R /AcroForm 8 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R /Annots [9 0 R] >>",
+        "<< /Length 37 >>\nstream\nBT /F1 18 Tf 40 330 Td (nexPDF) Tj ET\nendstream",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        "<< /Type /Outlines /First 7 0 R /Last 7 0 R /Count 1 >>",
+        "<< /Title (Saved bookmark) /Parent 6 0 R /Dest [3 0 R /Fit] >>",
+        "<< /Fields [9 0 R] /DA (/F1 12 Tf 0 g) /DR << /Font << /F1 5 0 R >> >> >>",
+        "<< /Type /Annot /Subtype /Widget /FT /Tx /T (Saved field) /V (Retained value) /Rect [20 20 180 50] /P 3 0 R >>",
+        "<< /Title (Preserved title) /Author (nexPDF regression) >>"
+    });
+    bytes.replace("/Root 1 0 R >>", "/Root 1 0 R /Info 10 0 R >>");
+    const QString input = d.filePath(QStringLiteral("graph.pdf"));
+    QFile file(input); QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write(bytes), bytes.size()); file.close();
+    nexpdf::DocumentSession s; QSignalSpy opened(&s, &nexpdf::DocumentSession::opened), saved(&s, &nexpdf::DocumentSession::saved);
+    s.open(input); QTRY_COMPARE(opened.size(), 1);
+    nexpdf::SaveOptions options; options.compress = false; options.useObjectStreams = false;
+    const QString output = d.filePath(QStringLiteral("saved-graph.pdf"));
+    s.saveAs(output, options); QTRY_COMPARE(saved.size(), 1);
+    QFile result(output); QVERIFY(result.open(QIODevice::ReadOnly));
+    const auto content = result.readAll();
+    for (const auto &key : {"/Outlines", "/AcroForm", "Saved bookmark", "Saved field", "Retained value", "Preserved title"}) {
+        QVERIFY2(content.contains(key), key);
+    }
+    nexpdf::DocumentSession reopened; QSignalSpy verified(&reopened, &nexpdf::DocumentSession::opened);
+    reopened.open(output); QTRY_COMPARE(verified.size(), 1);
+    QCOMPARE(qvariant_cast<nexpdf::DocumentInfo>(verified.first().first()).title, QStringLiteral("Preserved title"));
+    retainArtifact(output, QStringLiteral("saved-graph.pdf"));
+}
+
+void DocumentSessionTests::replacesOpenSourceWithoutLosingUndo()
+{
+    QTemporaryDir d; QVERIFY(d.isValid());
+    const QString input = writeMultiPageFixture(d);
+    nexpdf::DocumentSession s;
+    QSignalSpy opened(&s, &nexpdf::DocumentSession::opened), states(&s, &nexpdf::DocumentSession::stateChanged),
+        saved(&s, &nexpdf::DocumentSession::saved), failed(&s, &nexpdf::DocumentSession::failed);
+    s.open(input); QTRY_COMPARE(opened.size(), 1);
+    auto before = states.size();
+    nexpdf::EditOperation edit; edit.kind = nexpdf::EditKind::InsertBlankPage; edit.pageIndex = 1;
+    s.applyEdit(edit); QTRY_VERIFY(states.size() > before);
+    nexpdf::SaveOptions options; options.overwriteConfirmed = true;
+    s.saveAs(input, options); QTRY_VERIFY(saved.size() == 1 || !failed.isEmpty());
+    QVERIFY2(failed.isEmpty(), qPrintable(errorDescription(failed)));
+    before = states.size(); s.undo(); QTRY_VERIFY(states.size() > before);
+    QVERIFY(states.last().at(1).toBool());
+    s.saveAs(input, options); QTRY_VERIFY(saved.size() == 2 || !failed.isEmpty());
+    QVERIFY2(failed.isEmpty(), qPrintable(errorDescription(failed)));
+    nexpdf::DocumentSession verify; QSignalSpy verified(&verify, &nexpdf::DocumentSession::opened),
+        text(&verify, &nexpdf::DocumentSession::textExtracted);
+    verify.open(input); QTRY_COMPARE(verified.size(), 1);
+    QCOMPARE(qvariant_cast<nexpdf::DocumentInfo>(verified.first().first()).pageCount, 1);
+    verify.extractText(0, QRectF(0, 0, 300, 400)); QTRY_COMPARE(text.size(), 1);
+    QVERIFY(text.first().at(2).toString().contains(QStringLiteral("nexPDF")));
 }
 
 QTEST_MAIN(DocumentSessionTests)

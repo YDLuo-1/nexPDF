@@ -1,10 +1,10 @@
 # PDF engine research / PDF 引擎技术调研
 
-Research snapshot / 调研快照：2026-08-22. Release metadata and upstream architecture can change; verify upstream before revising dependency policy. / Release 元数据和上游架构会变化，调整依赖策略前必须重新核验。
+Research snapshot / 调研快照：2026-08-22; MuPDF pin refreshed 2026-10-30 / MuPDF 固定版本于 2026-10-30 更新。 Release metadata and upstream architecture can change; verify upstream before revising dependency policy. / Release 元数据和上游架构会变化，调整依赖策略前必须重新核验。
 
 | Project / 项目 | Main language and license / 主要语言与许可 | Relevant capability / 相关能力 | nexPDF decision / 结论 |
 |---|---|---|---|
-| [MuPDF](https://github.com/ArtifexSoftware/mupdf) | C, AGPL-3.0 | Fitz document layer, PDF object model, rendering devices, encryption, annotations, redaction, and low-level content changes | The only production PDF engine; pinned to 1.28.2. / 唯一生产 PDF 引擎，固定 1.28.2。 |
+| [MuPDF](https://github.com/ArtifexSoftware/mupdf) | C, AGPL-3.0 | Fitz document layer, PDF object model, rendering devices, encryption, annotations, redaction, and low-level content changes | The only production PDF engine; pinned to 1.28.6. / 唯一生产 PDF 引擎，固定 1.28.6。 |
 | [qpdf](https://github.com/qpdf/qpdf) | C++, Apache-2.0 | Mature encryption, structural transformation, validation, and command façades; no renderer | Validation-only independent checker and an architectural reference. / 仅作独立校验器和架构参考。 |
 | [PoDoFo](https://github.com/podofo/podofo) | C++17, LGPL/MPL | Parsing, creation, signing, and structural edits without a complete renderer | Do not add a second production engine. / 不引入第二生产引擎。 |
 | [PDFium](https://pdfium.googlesource.com/pdfium/+/refs/heads/main/README.md) | C++20, BSD | Chromium-grade rendering with a GN/Ninja toolchain; limited high-level editing | Too heavy for the first lightweight release. / 首版构建链和体积过重。 |

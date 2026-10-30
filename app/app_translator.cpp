@@ -143,7 +143,12 @@ AppTranslator::AppTranslator(QObject *parent) : QTranslator(parent)
         {"Unable to open the printer.", "无法打开打印机。"},
         {"Printing page %1 of %2", "正在打印第 %1 / %2 页"},
         {"Printed %1 page(s)", "已打印 %1 页"},
-        {"Printing failed", "打印失败"}
+        {"Printing failed", "打印失败"},
+        {"Printing cancelled", "打印已取消"},
+        {"Cancel", "取消"},
+        {"Preparing print job…", "正在准备打印…"},
+        {"This document does not grant copying permission.", "此文档未授予复制权限。"},
+        {"This document does not grant the requested printing permission.", "此文档未授予所请求的打印权限。"}
     };
     for (const auto &[english, chinese] : entries) {
         translations_.insert(QString::fromUtf8(english), QString::fromUtf8(chinese));
