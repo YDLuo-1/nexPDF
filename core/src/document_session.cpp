@@ -1059,6 +1059,7 @@ public:
 
         fz_context *context = runtime_->context();
         pdf_page *page = nullptr;
+        pdf_annot *createdAnnotation = nullptr;
         pdf_obj *pageObject = nullptr;
         pdf_obj *resources = nullptr;
         fz_buffer *contents = nullptr;
@@ -1110,6 +1111,7 @@ public:
         }
 
         fz_var(page);
+        fz_var(createdAnnotation);
         fz_var(pageObject);
         fz_var(resources);
         fz_var(contents);
@@ -1248,7 +1250,7 @@ public:
                     fz_throw(context, FZ_ERROR_ARGUMENT, "Unsupported edit operation");
                 }
                 page = pdf_load_page(context, pdf_, operation.pageIndex);
-                pdf_annot *annot = pdf_create_annot(context, page, type);
+                pdf_annot *annot = createdAnnotation = pdf_create_annot(context, page, type);
                 pdf_set_annot_name(context, annot, objectId.constData());
                 pdf_set_annot_author(context, annot, "nexPDF");
                 // Text-markup and ink annotations derive their bounding box from
@@ -1295,7 +1297,8 @@ public:
             fz_drop_image(context, image);
             pdf_drop_graft_map(context, graftMap);
             fz_drop_document(context, sourceDocument);
-            pdf_drop_page(context, page);
+            if (createdAnnotation) pdf_drop_annot(context, createdAnnotation);
+            if (page) pdf_drop_page(context, page);
             fz_drop_buffer(context, contents);
             pdf_drop_obj(context, resources);
             if (ownsPageObject) {
@@ -1797,7 +1800,7 @@ public:
             }
             fz_always(context) {
                 fz_drop_stext_page(context, textPage);
-                pdf_drop_page(context, page);
+                if (page) pdf_drop_page(context, page);
             }
             fz_catch(context) {
                 scanFailed = true;
@@ -2051,7 +2054,7 @@ public:
             pdf_end_operation(context, pdf_);
             operationStarted = false;
         }
-        fz_always(context) { pdf_drop_page(context, page); }
+        fz_always(context) { if (page) pdf_drop_page(context, page); }
         fz_catch(context) {
             const QString detail = engineMessage(context);
             if (operationStarted) {

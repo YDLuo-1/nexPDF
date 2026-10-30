@@ -12,6 +12,7 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 - Cancel obsolete canvas/thumbnail renders on invalidation and outside the viewport prefetch range. / 视图失效和滚出预取范围时取消过期页面、缩略图任务。
 - Preserve redo history when a partially applied edit fails; carry the small MuPDF journal patch in every build and corresponding-source archive. / 保留部分执行后失败编辑之前的重做历史，MuPDF 日志补丁统一进入构建和对应源码包。
 - Correct signed AES table shifts exposed by full core UBSan regression. / 修复完整核心 UBSan 回归发现的 AES 表值有符号移位。
+- Release annotation and unchanged-redaction-image references and guard nullable page/optional mask pointers, as exposed by full core ASan/UBSan. / 修复完整核心 ASan/UBSan 发现的批注、涂黑图像过滤引用泄漏，以及空页面和可选遮罩指针运算。
 
 ## [1.0.5-rc.1] - 2026-10-30
 

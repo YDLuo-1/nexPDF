@@ -87,8 +87,41 @@ def patch_aes_shifts() -> None:
     print("Applied AES unsigned 24-bit shift patch")
 
 
+def patch_optional_mask_rows() -> None:
+    source = Path(sys.argv[1]) / "source/fitz/draw-affine.c"
+    text = source.read_text(encoding="utf-8")
+    old = "\t\thp += hs;\n\t\tgp += gs;"
+    new = "\t\tif (hp) hp += hs;\n\t\tif (gp) gp += gs;"
+    if old not in text and text.count(new) == 1:
+        print("Optional image mask row patch already applied")
+        return
+    if text.count(old) != 1 or new in text:
+        raise RuntimeError("MuPDF affine source changed; review the optional mask patch before building")
+    source.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
+    print("Applied optional image mask row pointer guards")
+
+
+def patch_unchanged_filtered_image() -> None:
+    source = Path(sys.argv[1]) / "source/pdf/pdf-op-filter.c"
+    text = source.read_text(encoding="utf-8")
+    old = "\t\tif (new_image == image)\n\t\t{\n"
+    new = old + """\t\t\t/* nexPDF: the filter returned an owned reference; the caller still owns image. */
+\t\t\tif (p->options->image_filter)
+\t\t\t\tfz_drop_image(ctx, new_image);
+"""
+    if text.count(new) == 1:
+        print("Unchanged filtered image reference patch already applied")
+        return
+    if text.count(old) != 1:
+        raise RuntimeError("MuPDF image filter source changed; review the reference patch before building")
+    source.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
+    print("Applied unchanged filtered image reference release")
+
+
 if __name__ == "__main__":
     patch_cms()
     patch_empty_bitmap()
     patch_abandoned_redo()
     patch_aes_shifts()
+    patch_optional_mask_rows()
+    patch_unchanged_filtered_image()

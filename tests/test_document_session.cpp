@@ -1297,6 +1297,11 @@ void DocumentSessionTests::failedImportPreservesHistory()
     edit.sourcePages = {0, 99}; // Fail after one page has already been grafted.
     session.applyEdit(edit); QTRY_COMPARE(failed.size(), 1);
     QTRY_VERIFY(!session.hasUnsavedChanges());
+    edit.kind = nexpdf::EditKind::AddImage;
+    edit.imagePath = dir.filePath(QStringLiteral("missing-image.png"));
+    edit.bounds = QRectF(20, 20, 50, 50);
+    session.applyEdit(edit); QTRY_COMPARE(failed.size(), 2);
+    QTRY_VERIFY(!session.hasUnsavedChanges());
     QCOMPARE(states.size(), beforeState);
     const QString output = dir.filePath(QStringLiteral("after-failure.pdf"));
     const auto beforeSave = saved.size();
@@ -1309,7 +1314,7 @@ void DocumentSessionTests::failedImportPreservesHistory()
     session.redo(); QTRY_VERIFY(counts.size() > before);
     QCOMPARE(counts.last().first().toInt(), hasPreviousEdit ? 3 : 2);
     QVERIFY(session.hasUnsavedChanges());
-    QCOMPARE(failed.size(), 1);
+    QCOMPARE(failed.size(), 2);
 }
 
 QTEST_MAIN(DocumentSessionTests)
