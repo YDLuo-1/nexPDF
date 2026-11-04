@@ -2,9 +2,13 @@
 #include "pdf_canvas.h"
 
 #include <QAction>
+#include <QAccessible>
+#include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QDir>
 #include <QFile>
 #include <QLabel>
+#include <QLineEdit>
 #include <QInputDialog>
 #include <QMenu>
 #include <QMessageBox>
@@ -68,6 +72,8 @@ class MainWindowTests final : public QObject {
     Q_OBJECT
 
 private slots:
+    void modifiedTitleSurvivesSave();
+    void accessibleFieldNamesFollowLanguage();
     void queuedEditRequiresDiscardConfirmation();
     void zoomCancelsObsoleteRenders();
     void reopensEmptyUserPdfAsOwner();
@@ -75,6 +81,69 @@ private slots:
     void printActionOffersDialogForOpenDocument();
     void printsSelectedPagesAndCancels();
 };
+
+void MainWindowTests::accessibleFieldNamesFollowLanguage()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, dir.path());
+    QSettings().setValue(QStringLiteral("ui/language"), QStringLiteral("en"));
+    MainWindow window;
+    const QList<QPair<QWidget *, QLabel *>> fields = {
+        {window.watermarkText_, window.watermarkTextLabel_},
+        {window.watermarkOpacity_, window.watermarkOpacityLabel_},
+        {window.watermarkRotation_, window.watermarkRotationLabel_},
+        {window.watermarkScale_, window.watermarkScaleLabel_},
+        {window.watermarkPages_, window.watermarkPagesLabel_},
+        {window.watermarkLayer_, window.watermarkLayerLabel_},
+        {window.watermarkPosition_, window.watermarkPositionLabel_}
+    };
+    for (const QString &language : {QStringLiteral("English"), QStringLiteral("简体中文")}) {
+        QAction *languageAction = nullptr;
+        for (auto *action : window.findChildren<QAction *>()) {
+            if (action->text() == language) languageAction = action;
+        }
+        QVERIFY(languageAction != nullptr);
+        languageAction->trigger();
+        for (const auto &[field, label] : fields) {
+            auto *accessible = QAccessible::queryAccessibleInterface(field);
+            QVERIFY(accessible != nullptr);
+            QCOMPARE(accessible->text(QAccessible::Name), label->text());
+            QVERIFY(!accessible->text(QAccessible::Name).isEmpty());
+        }
+        auto *search = QAccessible::queryAccessibleInterface(window.searchEdit_);
+        QVERIFY(search != nullptr);
+        QCOMPARE(search->text(QAccessible::Name), window.searchEdit_->placeholderText());
+    }
+}
+
+void MainWindowTests::modifiedTitleSurvivesSave()
+{
+    QTest::failOnWarning("QWidget::setWindowModified: The window title does not contain a '[*]' placeholder");
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, dir.path());
+    QFile file(dir.filePath(QStringLiteral("title.pdf")));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(minimalPdf());
+    file.close();
+    MainWindow window;
+    window.show();
+    window.openFile(file.fileName());
+    QTRY_COMPARE(window.pageCount_, 1);
+    QVERIFY(!window.isWindowModified());
+    window.applyPageOperation(nexpdf::EditKind::InsertBlankPage);
+    QTRY_VERIFY(window.isWindowModified());
+    QSignalSpy saved(&window.session_, &nexpdf::DocumentSession::saved);
+    window.session_.saveAs(dir.filePath(QStringLiteral("renamed.pdf")), {});
+    QTRY_COMPARE(saved.size(), 1);
+    QTRY_VERIFY(!window.isWindowModified());
+    QVERIFY(window.windowTitle().contains(QStringLiteral("renamed")));
+    window.applyPageOperation(nexpdf::EditKind::InsertBlankPage);
+    QTRY_VERIFY(window.isWindowModified());
+}
 
 void MainWindowTests::queuedEditRequiresDiscardConfirmation()
 {
@@ -222,7 +291,11 @@ void MainWindowTests::opensFixtureAndCapturesUi()
 
     const QPixmap englishScreenshot = window.grab();
     QVERIFY(!englishScreenshot.isNull());
-    QCOMPARE(englishScreenshot.deviceIndependentSize(), QSizeF(window.size()));
+    QCOMPARE(englishScreenshot.devicePixelRatio(), window.devicePixelRatioF());
+    // Fractional scaling rounds the physical pixel count to an integer.
+    QCOMPARE(englishScreenshot.size(), window.size() * window.devicePixelRatioF());
+    qInfo() << "DPI capture:" << window.size() << englishScreenshot.size()
+            << englishScreenshot.devicePixelRatio();
     const QString output = qEnvironmentVariable("NEXPDF_TEST_OUTPUT_DIR");
     if (!output.isEmpty()) {
         QVERIFY(QDir().mkpath(output));
@@ -243,7 +316,8 @@ void MainWindowTests::opensFixtureAndCapturesUi()
     QTRY_COMPARE(fileMenu->title(), QStringLiteral("文件"));
     const QPixmap chineseScreenshot = window.grab();
     QVERIFY(!chineseScreenshot.isNull());
-    QCOMPARE(chineseScreenshot.deviceIndependentSize(), QSizeF(window.size()));
+    QCOMPARE(chineseScreenshot.devicePixelRatio(), window.devicePixelRatioF());
+    QCOMPARE(chineseScreenshot.size(), window.size() * window.devicePixelRatioF());
     if (!output.isEmpty()) {
         QVERIFY(chineseScreenshot.save(output + QStringLiteral("/ui-main-window.png")));
     }

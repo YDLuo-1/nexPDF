@@ -4,6 +4,13 @@ All notable changes follow Semantic Versioning. / 重要变更遵循语义化版
 
 ## [Unreleased]
 
+## [1.0.5-rc.3] - 2026-11-04
+
+- Restore the native unsaved title marker after opening and Save As. / 修复打开及另存后原生标题栏缺少未保存标记。
+- Label search and all seven watermark parameters for accessibility, including language switching. / 为搜索框及七项水印参数补齐随语言切换的无障碍名称。
+- Correct fractional-DPI screenshot rounding assertions; verify actual DPR 1/1.25/1.5/1.75/2 with ten UI checks each. / 修正小数缩放截图的像素取整断言，五档实际 DPR 各通过十项 UI 检查。
+- Refresh acceptance records, performance/stability measurements and the published Windows runtime inventory. Native IME/driver printing, physical output and macOS hardware remain unaccepted. / 更新验收、性能与稳定性记录及公开 Windows 包依赖清单；原生输入法/打印驱动、实体出纸和 macOS 真机仍未完成验收。
+
 ## [1.0.5-rc.2] - 2026-10-30
 
 - Require owner authentication to decrypt or replace PDF security settings, and source copy permission to import pages. Explicit owner authentication also works for PDFs with an empty user password. / 解密或重设安全设置需要所有者权限，页面导入需要源 PDF 复制权限；空用户密码 PDF 也会正确检查显式所有者认证。

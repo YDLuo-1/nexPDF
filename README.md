@@ -6,7 +6,7 @@
 
 nexPDF 是一个本地运行、跨平台的 PDF 查看与实用编辑工具，使用 C++20、Qt Widgets 和 MuPDF 构建。它不包含遥测，不上传文档，也不会自动执行 PDF JavaScript、启动嵌入文件或静默打开外部链接。
 
-> 项目状态：已发布 1.0 系列；当前维护版本为 `1.0.5-rc.1`。本轮重点修复保存、撤销、搜索、权限与打印可靠性，并更新 PDF 引擎安全补丁。验收证据和实机边界见[发布检查表](docs/release-checklist.md)。
+> 项目状态：已发布 1.0 系列；当前维护版本为 `1.0.5-rc.3`。本轮重点修复保存、撤销、搜索、权限与打印可靠性，并更新 PDF 引擎安全补丁。验收证据和实机边界见[发布检查表](docs/release-checklist.md)。
 >
 > **下载使用**：前往 [Releases](https://github.com/YDLuo-1/nexPDF/releases) 获取最新候选版的 Windows 便携 ZIP / 安装包、Linux AppImage、macOS DMG 与完整源码包；每次功能或修复合入后都会立即发布包含全部变更的候选版。
 
@@ -96,7 +96,7 @@ nexPDF 与任何其他同名或近似名称的 NexPDF 产品、公司或网站�
 
 nexPDF is a local, cross-platform PDF viewer and practical editor built with C++20, Qt Widgets, and MuPDF. It contains no telemetry, uploads no documents, and does not automatically execute PDF JavaScript, launch embedded files, or silently open external links.
 
-> Project status: the 1.0 series has shipped; the current maintenance candidate is `1.0.5-rc.1`. This update addresses saving, undo, search, permissions, printing reliability and PDF engine security patches. See the [release checklist](docs/release-checklist.md) for evidence and hardware acceptance limits.
+> Project status: the 1.0 series has shipped; the current maintenance candidate is `1.0.5-rc.3`. This update addresses saving, undo, search, permissions, printing reliability and PDF engine security patches. See the [release checklist](docs/release-checklist.md) for evidence and hardware acceptance limits.
 >
 > **Download**: head to [Releases](https://github.com/YDLuo-1/nexPDF/releases) for the latest release candidate with the Windows portable ZIP / installer, Linux AppImage, macOS DMG, and the full source archive; every merged feature or fix is followed immediately by a candidate containing all changes.
 

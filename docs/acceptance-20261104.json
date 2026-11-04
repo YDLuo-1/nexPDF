@@ -1,0 +1,636 @@
+{
+  "date": "2026-11-04",
+  "target_tag": "v1.0.5-rc.3",
+  "baseline_commit": "a70f5d598866f3ce26bc2a5d2bf5dae2dfac4102",
+  "environment": {
+    "qt": "6.11.2",
+    "mupdf": "1.28.6",
+    "cpu": "12th Gen Intel(R) Core(TM) i7-12800HX",
+    "os": "Microsoft Windows 11 家庭版 中文版",
+    "version": "10.0.26300"
+  },
+  "core_tests": {
+    "passed": 31,
+    "failed": 0,
+    "ctest_seconds": 14.87
+  },
+  "dpi_process_environment": {
+    "QT_QPA_PLATFORM": "windows",
+    "QT_ENABLE_HIGHDPI_SCALING": "0",
+    "QT_SCALE_FACTOR": "per row"
+  },
+  "dpi": [
+    {
+      "capture": "QINFO  : MainWindowTests::opensFixtureAndCapturesUi() DPI capture: QSize(1320, 860) QSize(1320, 860) 1",
+      "actual_dpr": "1",
+      "totals": "Totals: 10 passed, 0 failed, 0 skipped, 0 blacklisted, 5684ms"
+    },
+    {
+      "capture": "QINFO  : MainWindowTests::opensFixtureAndCapturesUi() DPI capture: QSize(1320, 860) QSize(1650, 1075) 1.25",
+      "actual_dpr": "1.25",
+      "totals": "Totals: 10 passed, 0 failed, 0 skipped, 0 blacklisted, 5062ms"
+    },
+    {
+      "capture": "QINFO  : MainWindowTests::opensFixtureAndCapturesUi() DPI capture: QSize(1320, 860) QSize(1980, 1290) 1.5",
+      "actual_dpr": "1.5",
+      "totals": "Totals: 10 passed, 0 failed, 0 skipped, 0 blacklisted, 5370ms"
+    },
+    {
+      "capture": "QINFO  : MainWindowTests::opensFixtureAndCapturesUi() DPI capture: QSize(1320, 860) QSize(2310, 1505) 1.75",
+      "actual_dpr": "1.75",
+      "totals": "Totals: 10 passed, 0 failed, 0 skipped, 0 blacklisted, 5842ms"
+    },
+    {
+      "capture": "QINFO  : MainWindowTests::opensFixtureAndCapturesUi() DPI capture: QSize(1282, 785) QSize(2564, 1570) 2",
+      "actual_dpr": "2",
+      "totals": "Totals: 10 passed, 0 failed, 0 skipped, 0 blacklisted, 6838ms"
+    }
+  ],
+  "independent_poppler": [
+    {
+      "render_sha256": "2ACD3D71D6F57E993E585F9AD33D91D785B86C2BBCA415041B629C074EE77960",
+      "sha256": "71E2BDD573BF11304B9D039B9683DA1F12AEF8EEF1425A48C5FFB54CE23FD313",
+      "file": "decrypted.pdf"
+    },
+    {
+      "render_sha256": "1B5C908CDAEB6D2CA33E06594927503C84F272A14F35CAE8A4166A4018228391",
+      "sha256": "EF2961C06C33EE325F09DB5D83B3936EB1527770385CDB6A7E3D643080283C86",
+      "file": "edited.pdf"
+    },
+    {
+      "render_sha256": "2ACD3D71D6F57E993E585F9AD33D91D785B86C2BBCA415041B629C074EE77960",
+      "sha256": "615C3F9DF57307AA316B9B04E345C3B37539CE6487572F257611E8EABBEF4429",
+      "file": "external-watermark-removed.pdf"
+    },
+    {
+      "render_sha256": "003213437FA953F8A5E5F9395D9D2A71E512D9E669B799AAA8445DDC23862FE0",
+      "sha256": "4C6FC8614BF74406CB4E985EEE3141E738BEEA97F911E63B23A718580C857030",
+      "file": "redacted.pdf"
+    },
+    {
+      "render_sha256": "2ACD3D71D6F57E993E585F9AD33D91D785B86C2BBCA415041B629C074EE77960",
+      "sha256": "A83D7E678A6D678C24938A9D974023B9E32263C3B6063D0030294E71D397BE7A",
+      "file": "repeated-save-plain-2.pdf"
+    },
+    {
+      "render_sha256": "2ACD3D71D6F57E993E585F9AD33D91D785B86C2BBCA415041B629C074EE77960",
+      "sha256": "A83D7E678A6D678C24938A9D974023B9E32263C3B6063D0030294E71D397BE7A",
+      "file": "repeated-save-plain-3.pdf"
+    },
+    {
+      "render_sha256": "19AD65D654988CBE8BFCB94A2F6D92D58E685489B59B79FE7E6747D629242F06",
+      "sha256": "E49B7956933CF5AE115EF14B07EA087DEECAF7F807800FBDB452E2980BF3341E",
+      "file": "saved-graph.pdf"
+    },
+    {
+      "render_sha256": "2FB08B8BF8608E722974159DF948659A018C0BEB1280DAF9370D7EA65DDDFF54",
+      "sha256": "F09B86F88015E68EF40054BC47A0ABA163C1FE5C0DDCDA886ABE38893C493F41",
+      "file": "watermark-marked.pdf"
+    },
+    {
+      "render_sha256": "2ACD3D71D6F57E993E585F9AD33D91D785B86C2BBCA415041B629C074EE77960",
+      "sha256": "DC93F05804343AD01C1D990DB77BFC948E77CEA9A54A23D831F998548A731898",
+      "file": "watermark-original.pdf"
+    },
+    {
+      "render_sha256": "2ACD3D71D6F57E993E585F9AD33D91D785B86C2BBCA415041B629C074EE77960",
+      "sha256": "75B5C949FEC7D6E63238F0C6FF3291428B1642F8B51EFF7580B439D709BF0526",
+      "file": "watermark-restored.pdf"
+    }
+  ],
+  "benchmarks": {
+    "performance": {
+      "cycle_rss_mib": [
+        20.359375,
+        20.75
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "pages-100.pdf",
+          "open_ms": 15,
+          "pages": 100
+        },
+        {
+          "cycle": 1,
+          "file": "pages-300.pdf",
+          "open_ms": 28,
+          "pages": 300
+        },
+        {
+          "cycle": 1,
+          "file": "pages-1000.pdf",
+          "open_ms": 18,
+          "pages": 1000
+        },
+        {
+          "cycle": 2,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 2,
+          "file": "pages-300.pdf",
+          "open_ms": 2,
+          "pages": 300
+        },
+        {
+          "cycle": 2,
+          "file": "pages-1000.pdf",
+          "open_ms": 2,
+          "pages": 1000
+        }
+      ],
+      "elapsed_seconds": 12.616,
+      "errors": 0,
+      "final_rss_mib": 20.75,
+      "initial_rss_mib": 13.71875,
+      "peak_rss_mib": 23.7109375,
+      "render_p50_ms": 3.8797,
+      "render_p95_ms": 6.1192,
+      "rendered_pages": 2800,
+      "rss_growth_after_warmup_mib": 0,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 2,
+      "stable_baseline_rss_mib": 20.75,
+      "throughput_pages_per_second": 221.9403931515536
+    },
+    "stability": {
+      "cycle_rss_mib": [
+        20.0546875,
+        20.27734375,
+        20.19140625,
+        20.2109375,
+        20.296875,
+        20.1640625,
+        20.24609375,
+        20.19921875,
+        20.41015625,
+        20.234375,
+        20.36328125,
+        20.26171875,
+        20.40234375,
+        20.38671875,
+        20.3984375,
+        20.39453125,
+        20.3515625,
+        20.40234375,
+        20.359375,
+        20.4140625,
+        20.6953125,
+        20.76953125,
+        20.75390625,
+        20.765625,
+        20.7734375,
+        20.640625,
+        20.8046875,
+        20.62890625,
+        20.62109375,
+        20.73046875,
+        20.796875,
+        20.7578125,
+        20.87109375,
+        20.7109375,
+        20.84765625,
+        20.6796875,
+        20.85546875,
+        20.671875,
+        20.90234375,
+        20.7421875,
+        20.92578125,
+        20.73046875,
+        20.875,
+        20.73046875,
+        20.890625,
+        20.8671875,
+        21.09375,
+        20.91796875,
+        21.10546875,
+        20.91015625
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 2,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 3,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 4,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 5,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 6,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 7,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 8,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 9,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 10,
+          "file": "pages-100.pdf",
+          "open_ms": 4,
+          "pages": 100
+        },
+        {
+          "cycle": 11,
+          "file": "pages-100.pdf",
+          "open_ms": 4,
+          "pages": 100
+        },
+        {
+          "cycle": 12,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 13,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 14,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 15,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 16,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 17,
+          "file": "pages-100.pdf",
+          "open_ms": 6,
+          "pages": 100
+        },
+        {
+          "cycle": 18,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 19,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 20,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 21,
+          "file": "pages-100.pdf",
+          "open_ms": 4,
+          "pages": 100
+        },
+        {
+          "cycle": 22,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 23,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 24,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 25,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 26,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 27,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 28,
+          "file": "pages-100.pdf",
+          "open_ms": 18,
+          "pages": 100
+        },
+        {
+          "cycle": 29,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 30,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 31,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 32,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 33,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 34,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 35,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 36,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 37,
+          "file": "pages-100.pdf",
+          "open_ms": 1,
+          "pages": 100
+        },
+        {
+          "cycle": 38,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 39,
+          "file": "pages-100.pdf",
+          "open_ms": 5,
+          "pages": 100
+        },
+        {
+          "cycle": 40,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 41,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 42,
+          "file": "pages-100.pdf",
+          "open_ms": 4,
+          "pages": 100
+        },
+        {
+          "cycle": 43,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        },
+        {
+          "cycle": 44,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 45,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 46,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 47,
+          "file": "pages-100.pdf",
+          "open_ms": 5,
+          "pages": 100
+        },
+        {
+          "cycle": 48,
+          "file": "pages-100.pdf",
+          "open_ms": 6,
+          "pages": 100
+        },
+        {
+          "cycle": 49,
+          "file": "pages-100.pdf",
+          "open_ms": 2,
+          "pages": 100
+        },
+        {
+          "cycle": 50,
+          "file": "pages-100.pdf",
+          "open_ms": 3,
+          "pages": 100
+        }
+      ],
+      "elapsed_seconds": 33.265,
+      "errors": 0,
+      "final_rss_mib": 20.91015625,
+      "initial_rss_mib": 13.6953125,
+      "peak_rss_mib": 22.62109375,
+      "render_p50_ms": 4.4315,
+      "render_p95_ms": 18.6975,
+      "rendered_pages": 5000,
+      "rss_growth_after_warmup_mib": 0.61328125,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 5,
+      "stable_baseline_rss_mib": 20.296875,
+      "throughput_pages_per_second": 150.30813166992334
+    },
+    "mixed-corpus": {
+      "cycle_rss_mib": [
+        23.96875
+      ],
+      "documents": [
+        {
+          "cycle": 1,
+          "file": "cjk-text.pdf",
+          "open_ms": 7,
+          "pages": 3
+        },
+        {
+          "cycle": 1,
+          "file": "damaged-xref.pdf",
+          "open_ms": 51,
+          "pages": 3
+        },
+        {
+          "cycle": 1,
+          "file": "embedded-fonts.pdf",
+          "open_ms": 16,
+          "pages": 1
+        },
+        {
+          "cycle": 1,
+          "file": "large-image.pdf",
+          "open_ms": 16,
+          "pages": 2
+        },
+        {
+          "cycle": 1,
+          "file": "object-streams.pdf",
+          "open_ms": 14,
+          "pages": 3
+        },
+        {
+          "cycle": 1,
+          "file": "optional-layers.pdf",
+          "open_ms": 11,
+          "pages": 1
+        },
+        {
+          "cycle": 1,
+          "file": "rtl-hebrew-arabic.pdf",
+          "open_ms": 15,
+          "pages": 1
+        },
+        {
+          "cycle": 1,
+          "file": "transparency.pdf",
+          "open_ms": 13,
+          "pages": 1
+        }
+      ],
+      "elapsed_seconds": 0.319,
+      "errors": 0,
+      "final_rss_mib": 23.96875,
+      "initial_rss_mib": 13.69921875,
+      "peak_rss_mib": 25.02734375,
+      "render_p50_ms": 7.1332,
+      "render_p95_ms": 33.8868,
+      "rendered_pages": 15,
+      "rss_growth_after_warmup_mib": 0,
+      "schema": "nexpdf-benchmark-v1",
+      "stable_baseline_cycle": 1,
+      "stable_baseline_rss_mib": 23.96875,
+      "throughput_pages_per_second": 47.02194357366771
+    }
+  },
+  "corpus_sha256": {
+    "cjk-text.pdf": "fc3ef7d94bec417276366eea85c572e7d9f895c00dcb644e9afd6b96cdac3cdf",
+    "damaged-xref.pdf": "e4ef7bb9c80655be1b88f2617f9f339fe91650fa6eaefe26ab9ff0ce1afe3bac",
+    "embedded-fonts.pdf": "f9ae473c5f882d4f5e34592d43d8f82482e578c181d43e6152ad8aec32168750",
+    "encrypted-aes256.pdf": "dc5193eaac153ece2e365f6846eaee745c8a3550e583b2218eb52a7d0e035ecd",
+    "large-image.pdf": "2c621c631bbc984ef74f07a9b2d8401b12fd0c6e7b2a803e5cd144db8da7d149",
+    "object-streams.pdf": "fb8c3235421cc276dc7ba7ecd351cf9b2f154ece34c84e9333eb6c56c808acff",
+    "optional-layers.pdf": "11613d38e04fc01985d4849772ebc2de42ea5fd6d8c299ffcf9e5a448bb4515c",
+    "pages-100.pdf": "816a06aa0d616255344e93e7ade3aa725ce50c59c37f94100a424e389dc61890",
+    "pages-1000.pdf": "6e02551d31402d5aa52d51c15bcb12a1064c643b4080b90f693a16e641ef2380",
+    "pages-300.pdf": "0b85ea77db38314fba3f5db799ed8fdc3184ddb17a0616cd50858d2ad146893c",
+    "rtl-hebrew-arabic.pdf": "134a8054b9e1db6dc85561104da06037a58c23788980dde26318525e22461a5c",
+    "transparency.pdf": "7a320546425ca4d55e8dd0da862a1c1a43fcf1bf52ca36ea18cb03a65cbe7eb8"
+  },
+  "tested_source_sha256": {
+    "app/main_window.cpp": "7e51c9e087ac338e3da9c4702b6167b5c0f1a75186519e2281d0a35312af5036",
+    "tests/test_main_window.cpp": "c83494787f5737cfa6cb412d781ab34f2674dde0cf9df1acfa33691f09928a00"
+  },
+  "screenshots_sha256": {
+    "tests/scale-1/ui-main-window-en.png": "a87e60591ac042fc0740da43c680a960a3e8409a5d04498402ab452a9595879c",
+    "tests/scale-1/ui-main-window.png": "5124a4b45475739290a54e24acb4f0cdaab3193642d16eeca28120192fb435b5",
+    "tests/scale-1.25/ui-main-window-en.png": "8fd1dcc64147177e5f64ca79c786b8a886b7922738854eebff6689ed916a4542",
+    "tests/scale-1.25/ui-main-window.png": "ebfb6fb6cc90ede5f069b4efc55f5c44ce7a03b7b01994a4e1ae2240c76c9f07",
+    "tests/scale-1.5/ui-main-window-en.png": "2d8317e96531441e64a77394b5840e4bd443ebf794cd6c1302e8458e6b003587",
+    "tests/scale-1.5/ui-main-window.png": "12e0ba894aa1601f2b920cd58173e4f6054e638bf4cbea25ad32d2d3fc4f713a",
+    "tests/scale-1.75/ui-main-window-en.png": "8d03a9533dcb2322c68eaac1188a0a80686fd84a3b0f01513439f55b93d1fcc1",
+    "tests/scale-1.75/ui-main-window.png": "cfb35952b09c988d1a8bde59db65c2a3561510e689017cd0bdbe7c20685ae2aa",
+    "tests/scale-2/ui-main-window-en.png": "b88ec29ebceb215f8d66949ba6e457412a564ace1cbf16eef3b640f4a0fe90c5",
+    "tests/scale-2/ui-main-window.png": "8bf8689ae65ca3264b6883c30034a081ddede5a4a16eaa7dbc4b22c5dbb51fcd"
+  },
+  "not_accepted": [
+    "native Microsoft Pinyin composition",
+    "native Microsoft Print to PDF driver dialog/output",
+    "physical paper output",
+    "real macOS hardware",
+    "mixed-monitor DPI transitions",
+    "full screen-reader and keyboard-only workflow"
+  ],
+  "interactive_stop": "User pressed physical Escape; no further computer-use actions performed."
+}

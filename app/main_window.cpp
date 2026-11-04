@@ -88,7 +88,7 @@ MainWindow::MainWindow(QWidget *parent)
         resetThumbnails();
         thumbnailList_->setCurrentRow(0);
         pageLabel_->setText(QStringLiteral("1 / %1").arg(pageCount_));
-        setWindowTitle(QStringLiteral("%1 — nexPDF").arg(info.title));
+        setWindowTitle(QStringLiteral("%1[*] — nexPDF").arg(info.title));
         statusLabel_->setText(tr("Ready"));
         currentFingerprint_ = info.fingerprint;
         setDocumentActionsEnabled(true);
@@ -143,7 +143,7 @@ MainWindow::MainWindow(QWidget *parent)
         currentFingerprint_ = fingerprint;
         signedDocument_ = false;
         modified_ = false;
-        setWindowTitle(QStringLiteral("%1 — nexPDF").arg(QFileInfo(path).completeBaseName()));
+        setWindowTitle(QStringLiteral("%1[*] — nexPDF").arg(QFileInfo(path).completeBaseName()));
         statusLabel_->setText(tr("Ready"));
     });
     connect(&session_, &nexpdf::DocumentSession::stateChanged, this,
@@ -917,6 +917,13 @@ void MainWindow::buildToolPanel()
     watermarkPagesLabel_ = new QLabel(tr("Page range"), panel);
     watermarkLayerLabel_ = new QLabel(tr("Layer"), panel);
     watermarkPositionLabel_ = new QLabel(tr("Position"), panel);
+    watermarkTextLabel_->setBuddy(watermarkText_);
+    watermarkOpacityLabel_->setBuddy(watermarkOpacity_);
+    watermarkRotationLabel_->setBuddy(watermarkRotation_);
+    watermarkScaleLabel_->setBuddy(watermarkScale_);
+    watermarkPagesLabel_->setBuddy(watermarkPages_);
+    watermarkLayerLabel_->setBuddy(watermarkLayer_);
+    watermarkPositionLabel_->setBuddy(watermarkPosition_);
     form->addRow(watermarkTextLabel_, watermarkText_);
     form->addRow(watermarkOpacityLabel_, watermarkOpacity_);
     form->addRow(watermarkRotationLabel_, watermarkRotation_);
@@ -999,6 +1006,7 @@ void MainWindow::retranslateUi()
     chineseAction_->setText(tr("简体中文"));
     aboutAction_->setText(tr("About nexPDF"));
     searchEdit_->setPlaceholderText(tr("Search"));
+    searchEdit_->setAccessibleName(tr("Search"));
     const auto setActionHint = [](QAction *action, const QString &description) {
         QString tooltip = description;
         if (!action->shortcut().isEmpty()) {
