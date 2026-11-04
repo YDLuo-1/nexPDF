@@ -2,7 +2,7 @@ add_executable(nexpdf_core_tests test_document_session.cpp)
 target_link_libraries(nexpdf_core_tests PRIVATE nexpdf_core Qt6::Test)
 
 add_test(NAME nexpdf_core_tests COMMAND nexpdf_core_tests
-  -o ${CMAKE_BINARY_DIR}/Testing/nexpdf-core-test.txt,txt)
+  -o ${CMAKE_BINARY_DIR}/Testing/nexpdf-core-test.txt,txt -o -,txt)
 set_tests_properties(nexpdf_core_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 set_tests_properties(nexpdf_core_tests PROPERTIES TIMEOUT 120)
 if(NEXPDF_ENABLE_SANITIZERS)
@@ -25,7 +25,7 @@ if(TARGET nexpdf_app_ui)
     target_compile_options(nexpdf_ui_tests PRIVATE -Wall -Wextra -Wpedantic)
   endif()
   add_test(NAME nexpdf_ui_tests COMMAND nexpdf_ui_tests
-    -o ${CMAKE_BINARY_DIR}/Testing/nexpdf-ui-test.txt,txt)
+    -o ${CMAKE_BINARY_DIR}/Testing/nexpdf-ui-test.txt,txt -o -,txt)
   set_tests_properties(nexpdf_ui_tests PROPERTIES TIMEOUT 120)
   if(WIN32)
     add_custom_command(TARGET nexpdf_ui_tests POST_BUILD
