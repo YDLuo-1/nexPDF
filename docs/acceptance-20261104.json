@@ -609,8 +609,8 @@
     "transparency.pdf": "7a320546425ca4d55e8dd0da862a1c1a43fcf1bf52ca36ea18cb03a65cbe7eb8"
   },
   "tested_source_sha256": {
-    "app/main_window.cpp": "2723af0d7fa3e1d0ca3b95a24c3e98777a293966151758a3909bfe22545fae93",
-    "tests/test_main_window.cpp": "c83494787f5737cfa6cb412d781ab34f2674dde0cf9df1acfa33691f09928a00",
+    "app/main_window.cpp": "7e51c9e087ac338e3da9c4702b6167b5c0f1a75186519e2281d0a35312af5036",
+    "tests/test_main_window.cpp": "4326746e1f7f883c592d9491d121e72ecf9e87a1acf063dd4825503302532105",
     "tests/CMakeLists.txt": "7d6398cfb1fa33da51ba55359db7c07fbab269d7de89c372a15d4ab769a45648"
   },
   "screenshots_sha256": {
@@ -641,14 +641,16 @@
   "final_offscreen_ui": {
     "passed": 10,
     "failed": 0,
-    "duration_ms": 2074,
+    "duration_ms": 2352,
     "backend": "Qt Windows offscreen",
-    "scope": "Explicit combo-box accessible names after Unix CI failure; no further native desktop interaction"
+    "scope": "Label relations and platform-native combo Name/Value contract; no further native desktop interaction"
   },
   "ci_diagnostic": {
     "first_run": 41798507135,
     "diagnostic_run": 41799595097,
     "linux_assertion": "Accessible Name: actual Foreground, expected Layer",
-    "fix": "Explicit localized accessible names for layer and position combo boxes; original assertions retained"
+    "fix": "Validate real translated label relations for all fields and combo Value; Unix combo Name intentionally equals current option, Windows Name equals label; remove redundant explicit combo names",
+    "recheck_run": 41801200075,
+    "qt_source": "https://github.com/qt/qtbase/blob/v6.11.2/src/widgets/accessible/complexwidgets.cpp#L381"
   }
 }

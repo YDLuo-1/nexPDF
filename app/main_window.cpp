@@ -1056,8 +1056,6 @@ void MainWindow::retranslateUi()
         watermarkPagesLabel_->setText(tr("Page range"));
         watermarkLayerLabel_->setText(tr("Layer"));
         watermarkPositionLabel_->setText(tr("Position"));
-        watermarkLayer_->setAccessibleName(tr("Layer"));
-        watermarkPosition_->setAccessibleName(tr("Position"));
         watermarkPages_->setPlaceholderText(tr("Example: 1-3,5; empty means all"));
         watermarkLayer_->setItemText(0, tr("Foreground"));
         watermarkLayer_->setItemText(1, tr("Background"));

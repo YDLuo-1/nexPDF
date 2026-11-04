@@ -109,7 +109,20 @@ void MainWindowTests::accessibleFieldNamesFollowLanguage()
         for (const auto &[field, label] : fields) {
             auto *accessible = QAccessible::queryAccessibleInterface(field);
             QVERIFY(accessible != nullptr);
-            QCOMPARE(accessible->text(QAccessible::Name), label->text());
+            const auto labels = accessible->relations(QAccessible::Label);
+            QVERIFY(std::any_of(labels.cbegin(), labels.cend(), [label](const auto &relation) {
+                return relation.first != nullptr && relation.first->object() == label
+                    && relation.first->text(QAccessible::Name) == label->text();
+            }));
+            QString expectedName = label->text();
+            if (auto *combo = qobject_cast<QComboBox *>(field)) {
+                QCOMPARE(accessible->text(QAccessible::Value), combo->currentText());
+#ifdef Q_OS_UNIX
+                // Qt exposes combo labels through relations and the current option as Name on Unix.
+                expectedName = combo->currentText();
+#endif
+            }
+            QCOMPARE(accessible->text(QAccessible::Name), expectedName);
             QVERIFY(!accessible->text(QAccessible::Name).isEmpty());
         }
         auto *search = QAccessible::queryAccessibleInterface(window.searchEdit_);
